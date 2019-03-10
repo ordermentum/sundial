@@ -71,7 +71,7 @@ bymonthday_field = @{ BYMONTHDAY_DIGIT* ~ ("," ~ BYMONTHDAY_DIGIT*)? }
 bymonthday_expr = { "BYMONTHDAY=" ~ bymonthday_field }
 
 BYYEARDAY_DIGIT = { '1'..'9' | ('1'..'9' ~ '1'..'9') | // 1-99
-                    ('1'..'2' ~ '1'..'9' ~ '1'..'9') | // 100 -299
-                    ("3" ~ '1'..'6' ~ '1'..'6') }      // 300 - 366
+                    ('1'..'2' ~ '1'..'9' ~ '1'..'9') | // 100-299
+                    ("3" ~ '1'..'6' ~ '1'..'6') }      // 300-366
 byyearday_field = @{ BYYEARDAY_DIGIT* ~ ("," ~ BYYEARDAY_DIGIT*)? }
 byyearday_expr = { "BYYEARDAY=" ~ byyearday_field }
