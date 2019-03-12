@@ -5,3 +5,7 @@ authors = ["shiveen <shiveen.pandita@ordermentum.com>"]
 edition = "2018"
 
 [dependencies]
+chrono = "0.4"
+serde_json = "1.0"
+pest = "2.1.0"
+pest_derive = "2.0"

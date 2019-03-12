@@ -1,0 +1,77 @@
+rrule_expr = { SOI ~ expr | EOI }
+
+
+expr = { freq_expr ~ (non_freq_expr)+ }
+
+recur_rule_part = _{ FREQ | INTERVAL | BYHOUR | BYMINUTE | BYSECOND | BYDAY | BYMONTHDAY | BYYEARDAY }
+    FREQ = { "FREQ" }
+    INTERVAL = { "INTERVAL" }
+    BYHOUR = { "BYHOUR" }
+    BYMINUTE = { "BYMINUTE" }
+    BYSECOND = { "BYSECOND" }
+    BYDAY = { "BYDAY" }
+    BYMONTHDAY = { "BYMONTHDAY" }
+    BYYEARDAY = { "BYYEARDAY" }
+
+
+freq_expr = { "FREQ=" ~ freq ~ ";"}
+non_freq_expr = { (non_freq_exprs ~ ";") | non_freq_exprs }
+non_freq_exprs = { interval_expr | count_expr | byhour_expr | byminute_expr | bysecond_expr | byday_expr | bymonthday_expr | byyearday_expr }
+
+freq = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }
+    secondly = { "SECONDLY" }
+    minutely = { "MINUTELY" }
+    hourly = { "HOURLY" }
+    daily = { "DAILY" }
+    weekly = { "WEEKLY" }
+    fortnightly = { "FORTNIGHTLY" }
+    monthly = { "MONTHLY" }
+    yearly = { "YEARLY" }
+
+count_field = @{ ASCII_DIGIT* }
+count_expr = { "COUNT=" ~ count_field }
+
+interval_field = @{ ASCII_DIGIT* }
+interval_expr = { "INTERVAL=" ~ interval_field }
+
+BYHOUR_DIGIT = { '0'..'9' |                     // 0-9
+                ("1" ~ '0'..'9') |              // 10-19
+                ("2" ~ '0'..'3') }              // 20-23
+byhour_field = @{ BYHOUR_DIGIT* ~ ("," ~ BYHOUR_DIGIT*)? }
+byhour_expr = { "BYHOUR=" ~ byhour_field }
+
+BYMINUTE_DIGIT = { '0'..'9' |                   // 0-9
+                   ('1'..'4' ~ '0'..'9') |      // 10-49
+                   ("5" | '0'..'9') }           // 50-59
+byminute_field = @{ BYMINUTE_DIGIT* ~ ("," ~ BYMINUTE_DIGIT*)? }
+byminute_expr = { "BYMINUTE=" ~ byminute_field }
+
+
+BYSECOND_DIGIT = { '0'..'9' |                   // 0-9
+                   ('1'..'5' ~ '0'..'9') |      // 10-59
+                   ("60") }                     // 60
+bysecond_field = @{ BYSECOND_DIGIT* ~ ("," ~ BYSECOND_DIGIT*)? }
+bysecond_expr = { "BYSECOND=" ~ bysecond_field }
+
+weekday = { monday | tuesday | wednesday | thursday | friday | saturday | sunday }
+    monday = { "MO" }
+    tuesday = { "TU" }
+    wednesday = { "WE" }
+    thursday = { "TH" }
+    friday = { "FR" }
+    saturday = { "SA" }
+    sunday = { "SU" }
+byday_field = @{ weekday ~ ("," ~ weekday)? }
+byday_expr = { "BYDAY=" ~ byday_field }
+
+BYMONTHDAY_DIGIT = { '1'..'9' |                        // 1-9
+                    ('1'..'2' ~ '1'..'9') |            // 10-29
+                    ("3" ~ '0'..'1') }                 // 30-31
+bymonthday_field = @{ BYMONTHDAY_DIGIT* ~ ("," ~ BYMONTHDAY_DIGIT*)? }
+bymonthday_expr = { "BYMONTHDAY=" ~ bymonthday_field }
+
+BYYEARDAY_DIGIT = { '1'..'9' | ('1'..'9' ~ '1'..'9') | // 1-99
+                    ('1'..'2' ~ '1'..'9' ~ '1'..'9') | // 100-299
+                    ("3" ~ '1'..'6' ~ '1'..'6') }      // 300-366
+byyearday_field = @{ BYYEARDAY_DIGIT* ~ ("," ~ BYYEARDAY_DIGIT*)? }
+byyearday_expr = { "BYYEARDAY=" ~ byyearday_field }
