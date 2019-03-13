@@ -126,8 +126,20 @@ fn convert_rrule_to_json(
     println!("Json is {}", serde_json::to_string(&rrule_result).unwrap());
 }
 
+
+// ToDo : Add validation for checking that the RRULE string was properly extracted from the parser
+// by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=YEARLY;COUNT=6;BYDAY=TU,TH".to_owned();
+    let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
     convert_rrule_to_json(s)
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use serde_json::json;
+
+
 }
