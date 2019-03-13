@@ -7,5 +7,6 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 pest = "2.1.0"
 pest_derive = "2.0"

@@ -3,20 +3,16 @@ rrule_expr = { SOI ~ expr | EOI }
 
 expr = { freq_expr ~ (non_freq_expr)+ }
 
-recur_rule_part = _{ FREQ | INTERVAL | BYHOUR | BYMINUTE | BYSECOND | BYDAY | BYMONTHDAY | BYYEARDAY }
-    FREQ = { "FREQ" }
-    INTERVAL = { "INTERVAL" }
-    BYHOUR = { "BYHOUR" }
-    BYMINUTE = { "BYMINUTE" }
-    BYSECOND = { "BYSECOND" }
-    BYDAY = { "BYDAY" }
-    BYMONTHDAY = { "BYMONTHDAY" }
-    BYYEARDAY = { "BYYEARDAY" }
-
-
 freq_expr = { "FREQ=" ~ freq ~ ";"}
-non_freq_expr = { (non_freq_exprs ~ ";") | non_freq_exprs }
-non_freq_exprs = { interval_expr | count_expr | byhour_expr | byminute_expr | bysecond_expr | byday_expr | bymonthday_expr | byyearday_expr }
+non_freq_expr = _{ (non_freq_exprs ~ ";") | non_freq_exprs }
+non_freq_exprs = _{ interval_expr |
+                    count_expr |
+                    byhour_expr |
+                    byminute_expr |
+                    bysecond_expr |
+                    byday_expr |
+                    bymonthday_expr |
+                    byyearday_expr }
 
 freq = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }
     secondly = { "SECONDLY" }
