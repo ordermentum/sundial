@@ -15,14 +15,23 @@ struct RRuleParser;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RRule<'a> {
+    #[serde(skip_serializing_if = "String::is_empty")]
     frequency: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     count: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     interval: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_hour: Vec<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_minute: Vec<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_second: Vec<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_day: Vec<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_month_day: Vec<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_year_day: Vec<&'a str>,
 }
 
