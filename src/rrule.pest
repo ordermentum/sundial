@@ -1,11 +1,11 @@
 rrule_expr = { SOI ~ expr | EOI }
 
 
-expr = { freq_expr ~ (non_freq_expr)+ }
+expr = { freq_exprs ~ ((non_freq_exprs)+)? }
 
-freq_expr = { "FREQ=" ~ freq ~ ";"}
-non_freq_expr = _{ (non_freq_exprs ~ ";") | non_freq_exprs }
-non_freq_exprs = _{ interval_expr |
+freq_exprs = { ("FREQ=" ~ freq ~ ";") | ("FREQ=" ~ freq) }
+non_freq_exprs = _{ (non_freq_expr ~ ";") | non_freq_expr }
+non_freq_expr = _{ interval_expr |
                     count_expr |
                     byhour_expr |
                     byminute_expr |

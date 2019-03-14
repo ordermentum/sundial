@@ -63,61 +63,76 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 
     for line in parse_result.into_inner() {
         match line.as_rule() {
-            Rule::freq_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str();
-                rrule_result.frequency = this_rule.to_string()
+            Rule::freq_exprs => {
+                rrule_result.frequency = line.into_inner().next().unwrap().as_str().to_string();
             }
 
             Rule::interval_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str();
-                rrule_result.interval = this_rule.to_string()
+                rrule_result.interval = line.into_inner().next().unwrap().as_str().to_string();
             }
 
             Rule::count_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str();
-                rrule_result.count = this_rule.to_string()
+                rrule_result.count = line.into_inner().next().unwrap().as_str().to_string();
             }
 
             Rule::byhour_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                rrule_result.by_hour = this_rule
+                rrule_result.by_hour = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
 
             Rule::byminute_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                rrule_result.by_minute = this_rule
+                rrule_result.by_minute = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
 
             Rule::bysecond_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                ;
-                rrule_result.by_second = this_rule
+                rrule_result.by_second = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
 
             Rule::byday_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                rrule_result.by_day = this_rule
+                rrule_result.by_day = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
 
             Rule::bymonthday_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                ;
-                rrule_result.by_month_day = this_rule
+                rrule_result.by_month_day = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
 
             Rule::byyearday_expr => {
-                let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
-                ;
-                rrule_result.by_year_day = this_rule
+                rrule_result.by_year_day = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
             }
             _ => {}
         }
@@ -128,8 +143,9 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
+    //    let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
 
+    let s = "FREQ=DAILY".to_owned();
     let mut rrule_result = RRule {
         frequency: String::from(""),
         count: String::from(""),
@@ -148,28 +164,63 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-
+    use crate::{convert_to_rrule, RRule};
     use serde_json::json;
-    use crate::{RRule, convert_to_rrule};
+
+    struct RRuleTestCase<'a> {
+        rrule_string: &'a str,
+        expected_flat_json: &'a str,
+    }
 
     #[test]
     fn test_we_can_parse_to_proper_json() {
-        let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
+        let rrule_test_cases: Vec<RRuleTestCase> = vec![
+            RRuleTestCase {
+                rrule_string: "FREQ=DAILY",
+                expected_flat_json: r#"{"frequency":"DAILY"}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27",
+                expected_flat_json: r#"{"frequency":"MONTHLY","interval":"1","byHour":["9"],"byMinute":["1"],"byMonthDay":["15","27"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=DAILY;BYHOUR=1,3",
+                expected_flat_json: r#"{"frequency":"DAILY","byHour":["1","3"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=DAILY;BYHOUR=1,3",
+                expected_flat_json: r#"{"frequency":"DAILY","byHour":["1","3"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=17;BYMINUTE=30;BYDAY=SU",
+                expected_flat_json: r#"{"frequency":"WEEKLY","interval":"1","byHour":["17"],"byMinute":["30"],"byDay":["SU"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=17;BYMINUTE=30;BYDAY=SU",
+                expected_flat_json: r#"{"frequency":"WEEKLY","interval":"1","byHour":["17"],"byMinute":["30"],"byDay":["SU"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
+                expected_flat_json: r#"{"frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
+            },
+        ];
 
-        let mut rrule_result = RRule {
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        for i in &rrule_test_cases {
+            let mut rrule_result = RRule {
+                frequency: String::from(""),
+                count: String::from(""),
+                interval: String::from(""),
+                by_hour: Vec::new(),
+                by_minute: Vec::new(),
+                by_second: Vec::new(),
+                by_day: Vec::new(),
+                by_month_day: Vec::new(),
+                by_year_day: Vec::new(),
+            };
 
-        convert_to_rrule(&mut rrule_result, &s);
-        let expected = r#"{"frequency":"MONTHLY","interval":"1","byHour":["9"],"byMinute":["1"],"byMonthDay":["15","27"]}"#;
-        assert_eq!(rrule_result.to_json(), expected)
+            convert_to_rrule(&mut rrule_result, i.rrule_string);
+
+            assert_eq!(i.expected_flat_json, rrule_result.to_json())
+        }
     }
 }
