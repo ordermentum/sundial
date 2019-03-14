@@ -1,7 +1,7 @@
 rrule_expr = { SOI ~ expr | EOI }
 
 
-expr = { freq_exprs ~ ((non_freq_exprs)+)? }
+expr = { (freq_exprs ~ ((non_freq_exprs)+)?) | (((non_freq_exprs)+)? ~ freq_exprs) }
 
 freq_exprs = { ("FREQ=" ~ freq ~ ";") | ("FREQ=" ~ freq) }
 non_freq_exprs = _{ (non_freq_expr ~ ";") | non_freq_expr }
