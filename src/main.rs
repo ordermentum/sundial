@@ -1,10 +1,9 @@
 #[macro_use]
 extern crate pest_derive;
 
-use pest::prec_climber::{Assoc, Operator, PrecClimber};
+use serde::Serialize;
 use serde_json::json;
 use std::env;
-use serde::Serialize;
 
 use pest::Parser;
 
@@ -35,11 +34,15 @@ struct RRule<'a> {
     by_year_day: Vec<&'a str>,
 }
 
-//impl<'a> RRule<'a> {
-//    fn to_json(&self) -> String {
-//        serde_json::to_string(self).unwrap()
-//    }
-//}
+impl<'a> RRule<'a> {
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+}
 
 /// error occurred when parsing user input
 #[derive(Debug)]
@@ -52,16 +55,13 @@ use pest::iterators::Pair;
 use std::collections::HashMap;
 
 /// converts and rrule string to a rrule struct
-fn convert_to_rrule(
-    rrule_result: &RRule,
-    rrule_string: String,
-) {
-
-    let parse_result = RRuleParser::parse(Rule::expr, rrule_string.as_str())
+fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
+    let parse_result = RRuleParser::parse(Rule::expr, rrule_string)
         .expect("unsuccessful parse") // unwrap the parse result
-        .next().unwrap();
+        .next()
+        .unwrap();
 
-    for mut line in parse_result.into_inner() {
+    for line in parse_result.into_inner() {
         match line.as_rule() {
             Rule::freq_expr => {
                 let mut inner_rules = line.into_inner();
@@ -124,7 +124,6 @@ fn convert_to_rrule(
     }
 }
 
-
 // ToDo : Add validation for checking that the RRULE string was properly extracted from the parser
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
@@ -143,15 +142,34 @@ fn main() {
         by_year_day: Vec::new(),
     };
 
-    let rrule = convert_to_rrule(&rrule_result, s);
-    println!("Json is {}", rrule.to_json());
+    convert_to_rrule(&mut rrule_result, &s);
+    println!("Json is {}", rrule_result.to_json());
 }
 
+#[cfg(test)]
+mod tests {
 
-//#[cfg(test)]
-//mod tests {
-//
-//    use serde_json::json;
-//
-//
-//}
+    use serde_json::json;
+    use crate::{RRule, convert_to_rrule};
+
+    #[test]
+    fn test_we_can_parse_to_proper_json() {
+        let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
+
+        let mut rrule_result = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+
+        convert_to_rrule(&mut rrule_result, &s);
+        let expected = r#"{"frequency":"MONTHLY","interval":"1","byHour":["9"],"byMinute":["1"],"byMonthDay":["15","27"]}"#;
+        assert_eq!(rrule_result.to_json(), expected)
+    }
+}
