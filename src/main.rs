@@ -35,6 +35,12 @@ struct RRule<'a> {
     by_year_day: Vec<&'a str>,
 }
 
+//impl<'a> RRule<'a> {
+//    fn to_json(&self) -> String {
+//        serde_json::to_string(self).unwrap()
+//    }
+//}
+
 /// error occurred when parsing user input
 #[derive(Debug)]
 pub struct ParseError {
@@ -45,21 +51,11 @@ pub struct ParseError {
 use pest::iterators::Pair;
 use std::collections::HashMap;
 
-/// converts and rrule string to a jsonified response
-fn convert_rrule_to_json(
+/// converts and rrule string to a rrule struct
+fn convert_to_rrule(
+    rrule_result: &RRule,
     rrule_string: String,
 ) {
-    let mut rrule_result = RRule {
-        frequency: String::from(""),
-        count: String::from(""),
-        interval: String::from(""),
-        by_hour: Vec::new(),
-        by_minute: Vec::new(),
-        by_second: Vec::new(),
-        by_day: Vec::new(),
-        by_month_day: Vec::new(),
-        by_year_day: Vec::new(),
-    };
 
     let parse_result = RRuleParser::parse(Rule::expr, rrule_string.as_str())
         .expect("unsuccessful parse") // unwrap the parse result
@@ -99,7 +95,8 @@ fn convert_rrule_to_json(
 
             Rule::bysecond_expr => {
                 let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();;
+                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
+                ;
                 rrule_result.by_second = this_rule
             }
 
@@ -111,19 +108,20 @@ fn convert_rrule_to_json(
 
             Rule::bymonthday_expr => {
                 let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();;
+                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
+                ;
                 rrule_result.by_month_day = this_rule
             }
 
             Rule::byyearday_expr => {
                 let mut inner_rules = line.into_inner();
-                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();;
+                let this_rule = inner_rules.next().unwrap().as_str().split(",").collect();
+                ;
                 rrule_result.by_year_day = this_rule
             }
             _ => {}
         }
     }
-    println!("Json is {}", serde_json::to_string(&rrule_result).unwrap());
 }
 
 
@@ -132,14 +130,28 @@ fn convert_rrule_to_json(
 fn main() {
     let args: Vec<String> = env::args().collect();
     let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=15,27".to_owned();
-    convert_rrule_to_json(s)
+
+    let mut rrule_result = RRule {
+        frequency: String::from(""),
+        count: String::from(""),
+        interval: String::from(""),
+        by_hour: Vec::new(),
+        by_minute: Vec::new(),
+        by_second: Vec::new(),
+        by_day: Vec::new(),
+        by_month_day: Vec::new(),
+        by_year_day: Vec::new(),
+    };
+
+    let rrule = convert_to_rrule(&rrule_result, s);
+    println!("Json is {}", rrule.to_json());
 }
 
 
-#[cfg(test)]
-mod tests {
-
-    use serde_json::json;
-
-
-}
+//#[cfg(test)]
+//mod tests {
+//
+//    use serde_json::json;
+//
+//
+//}
