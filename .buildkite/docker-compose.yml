@@ -1,0 +1,5 @@
+services:
+  common:
+    build:
+      context: ../
+      dockerfile: develop.Dockerfile
