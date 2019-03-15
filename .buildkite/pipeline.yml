@@ -4,3 +4,7 @@ steps:
   - name: "Test"
     artifact_paths: 'build/test-results'
     command: ".buildkite/test.sh"
+    plugins:
+      - github.com/buildkite-plugins/docker-compose-buildkite-plugin#b5922a5b0:
+          run: test
+          config: .buildkite/docker-compose.yml
