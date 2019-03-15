@@ -92,7 +92,7 @@ impl<'a> RRule<'a> {
         if self.frequency.ne("SECONDLY") {
             let mut second: u32 = start_date.second();
             if !self.by_second.is_empty() {
-                second= self.by_second.first().unwrap().parse().unwrap();
+                second = self.by_second.first().unwrap().parse().unwrap();
             }
             start_date_with_intervals.with_second(second);
         }
@@ -107,7 +107,8 @@ impl<'a> RRule<'a> {
 
         if self.frequency.ne("SECONDLY")
             && self.frequency.ne("MONTHLY")
-            && self.frequency.ne("HOURLY") {
+            && self.frequency.ne("HOURLY")
+        {
             let mut hour: u32 = start_date.hour();
             if !self.by_hour.is_empty() {
                 hour = self.by_hour.first().unwrap().parse().unwrap();
@@ -135,17 +136,11 @@ impl<'a> RRule<'a> {
                 next_date = next_date.with_day(month_day).unwrap()
             } else if start_date_day > month_day {
                 if start_date.month().lt(&(12 as u32)) {
-                    let mut month_added = next_date
-                        .with_month(start_date.month() + 1)
-                        .unwrap();
+                    let mut month_added = next_date.with_month(start_date.month() + 1).unwrap();
                     next_date = month_added.with_day(month_day).unwrap();
                 } else {
-                    let mut year_added = next_date
-                        .with_year(start_date.year() + 1)
-                        .unwrap();
-                    let mut month_added = year_added
-                        .with_month(1)
-                        .unwrap();
+                    let mut year_added = next_date.with_year(start_date.year() + 1).unwrap();
+                    let mut month_added = year_added.with_month(1).unwrap();
                     next_date = month_added.with_day(month_day).unwrap();
                 }
             } else if start_date_day == month_day {
@@ -155,17 +150,11 @@ impl<'a> RRule<'a> {
                 // for next month
                 if start_date_with_intervals.ge(&start_date) {
                     if start_date.month().lt(&(12 as u32)) {
-                        let mut month_added = next_date
-                            .with_month(start_date.month() + 1)
-                            .unwrap();
+                        let mut month_added = next_date.with_month(start_date.month() + 1).unwrap();
                         next_date = month_added.with_day(month_day).unwrap();
                     } else {
-                        let mut year_added = next_date
-                            .with_year(start_date.year() + 1)
-                            .unwrap();
-                        let mut month_added = year_added
-                            .with_month(1)
-                            .unwrap();
+                        let mut year_added = next_date.with_year(start_date.year() + 1).unwrap();
+                        let mut month_added = year_added.with_month(1).unwrap();
                         next_date = month_added.with_day(month_day).unwrap();
                     }
                 }
@@ -301,9 +290,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::{convert_to_rrule, RRule};
-    use serde_json::json;
-    use chrono::{Utc, Datelike};
     use chrono::offset::TimeZone;
+    use chrono::{Datelike, Utc};
+    use serde_json::json;
 
     struct RRuleTestCase<'a> {
         rrule_string: &'a str,
@@ -382,8 +371,14 @@ mod tests {
             by_year_day: Vec::new(),
         };
 
-        convert_to_rrule(&mut rrule_result, "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27");
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
         let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
-        assert_eq!(test_start_date.with_day(28).unwrap(), rrule_result.get_next_date(test_start_date))
+        assert_eq!(
+            test_start_date.with_day(28).unwrap(),
+            rrule_result.get_next_date(test_start_date)
+        )
     }
 }
