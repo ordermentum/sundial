@@ -4,3 +4,7 @@ services:
     build:
       context: ../
       dockerfile: develop.Dockerfile
+
+  test:
+    extends: common
+    command: cargo test
