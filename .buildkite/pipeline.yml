@@ -1,0 +1,6 @@
+steps:
+  - wait
+
+  - name: "Test"
+    artifact_paths: 'build/test-results'
+    command: ".buildkite/test.sh"
