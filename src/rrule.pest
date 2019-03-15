@@ -1,20 +1,23 @@
 rrule_expr = { SOI ~ expr | EOI }
 
 
-expr = { (freq_exprs ~ ((non_freq_exprs)+)?) | (((non_freq_exprs)+)? ~ freq_exprs) }
+expr = {  ((recur_exprs)+)? }
 
-freq_exprs = { ("FREQ=" ~ freq ~ ";") | ("FREQ=" ~ freq) }
-non_freq_exprs = _{ (non_freq_expr ~ ";") | non_freq_expr }
-non_freq_expr = _{ interval_expr |
-                    count_expr |
-                    byhour_expr |
-                    byminute_expr |
-                    bysecond_expr |
-                    byday_expr |
-                    bymonthday_expr |
-                    byyearday_expr }
+recur_exprs = _{ (recur_expr ~ ";") | recur_expr }
 
-freq = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }
+recur_expr = _{ freq_expr |
+                interval_expr |
+                count_expr |
+                byhour_expr |
+                byminute_expr |
+                bysecond_expr |
+                byday_expr |
+                bymonthday_expr |
+                byyearday_expr |
+                wkst_expr }
+
+freq_expr = { "FREQ=" ~ freq_field }
+freq_field = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }
     secondly = { "SECONDLY" }
     minutely = { "MINUTELY" }
     hourly = { "HOURLY" }
@@ -71,3 +74,6 @@ BYYEARDAY_DIGIT = { '1'..'9' | ('1'..'9' ~ '1'..'9') | // 1-99
                     ("3" ~ '1'..'6' ~ '1'..'6') }      // 300-366
 byyearday_field = @{ BYYEARDAY_DIGIT* ~ ("," ~ BYYEARDAY_DIGIT*)? }
 byyearday_expr = { "BYYEARDAY=" ~ byyearday_field }
+
+wkst_field = @{ weekday }
+wkst_expr = { "WKST=" ~ weekday }

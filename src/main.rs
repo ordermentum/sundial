@@ -1,11 +1,11 @@
 #[macro_use]
 extern crate pest_derive;
 
+use chrono::prelude::*;
+use pest::Parser;
 use serde::Serialize;
 use serde_json::json;
 use std::env;
-
-use pest::Parser;
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
@@ -20,6 +20,8 @@ struct RRule<'a> {
     count: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     interval: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    wkst: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_hour: Vec<&'a str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -42,6 +44,97 @@ impl<'a> RRule<'a> {
     fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self).unwrap()
     }
+
+    // show me the money
+    fn get_next_iter_date(&self) {
+        // ToDo: need to add this to the parser
+        let dt_start = Utc::now(); // time to start, once added to the parser, we'll use it
+        let mut count: i8 = 52; // default count of iterations to build
+
+        // assign default weekstart and reassign if present
+        let mut wkst = "MO";
+
+        if !self.wkst.is_empty() {
+            wkst = &self.wkst
+        }
+
+        if !self.count.is_empty() {
+            count = self.count.parse().unwrap()
+        }
+    }
+
+    fn get_next_date(&self, star_date: DateTime<Utc>) {
+        // handle monthly
+        if self.frequency == "MONTHLY" {
+            self.handle_monthly(star_date)
+        }
+    }
+
+    // set the lower interval time for start date
+    fn set_lower_intervals(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut start_date_with_intervals = start_date;
+
+        if self.frequency.ne("SECONDLY") {
+            let mut second: u32 = start_date.second();
+            if !self.by_second.is_empty() {
+                second= self.by_second.first().unwrap().parse().unwrap();
+            }
+            start_date_with_intervals.with_second(second);
+        }
+
+        if self.frequency.ne("SECONDLY") && self.frequency.ne("MONTHLY") {
+            let mut minute: u32 = start_date.minute();
+            if !self.by_minute.is_empty() {
+                minute = self.by_minute.first().unwrap().parse().unwrap();
+            }
+            start_date_with_intervals.with_minute(minute);
+        }
+
+        if self.frequency.ne("SECONDLY")
+            && self.frequency.ne("MONTHLY")
+            && self.frequency.ne("HOURLY") {
+            let mut hour: u32 = start_date.hour();
+            if !self.by_hour.is_empty() {
+                hour = self.by_hour.first().unwrap().parse().unwrap();
+            }
+            start_date_with_intervals.with_hour(hour);
+        }
+
+        start_date_with_intervals
+    }
+
+    fn handle_monthly(&self, star_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut next_date = star_date;
+        let panic_value: u32 = 50;
+        let month_day: u32 = self.by_month_day.first().unwrap_or("50".as_ref()).parse().unwrap;
+        if month_day.eq(&panic_value) {
+            // go crazy, we don't like this since if you're asking me to process monthly
+            // I will need a bymonth day present and there is no way I can recover from this
+            panic!("Need a bymonth rrule part when evaluation rules with monthly freq");
+        } else {
+            let start_date_day = star_date.day();
+            if start_date_day < self.by_month_day {
+                next_date = next_date.with_day(month_day).unwrap()
+            } else if start_date_day > self.by_month_day {
+                let next_date_with_month_added = next_date
+                    .with_month(star_date.month() + 1)
+                    .unwrap();
+                next_date = next_date_With_month_added.with_day(month_day).unwrap();
+            } else if start_date_day == self.by_month_day {
+                let start_date_with_intervals = self.set_lower_intervals(star_date);
+
+                // even if its the same day, if we've shot past the time, we will need to schedule
+                // for next month
+                if start_date_with_intervals.gt(star_date) {
+                    let next_date_with_month_added = next_date
+                        .with_month(star_date.month() + 1)
+                        .unwrap();
+                    next_date = next_date_With_month_added.with_day(month_day).unwrap();
+                }
+            }
+        }
+        next_date
+    }
 }
 
 /// error occurred when parsing user input
@@ -63,12 +156,16 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 
     for line in parse_result.into_inner() {
         match line.as_rule() {
-            Rule::freq_exprs => {
+            Rule::freq_expr => {
                 rrule_result.frequency = line.into_inner().next().unwrap().as_str().to_string();
             }
 
             Rule::interval_expr => {
                 rrule_result.interval = line.into_inner().next().unwrap().as_str().to_string();
+            }
+
+            Rule::wkst_expr => {
+                rrule_result.wkst = line.into_inner().next().unwrap().as_str().to_string();
             }
 
             Rule::count_expr => {
@@ -149,6 +246,7 @@ fn main() {
         frequency: String::from(""),
         count: String::from(""),
         interval: String::from(""),
+        wkst: String::from(""),
         by_hour: Vec::new(),
         by_minute: Vec::new(),
         by_second: Vec::new(),
@@ -213,6 +311,7 @@ mod tests {
                 frequency: String::from(""),
                 count: String::from(""),
                 interval: String::from(""),
+                wkst: String::from(""),
                 by_hour: Vec::new(),
                 by_minute: Vec::new(),
                 by_second: Vec::new(),
