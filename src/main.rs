@@ -424,4 +424,9 @@ mod tests {
             rrule_result.get_next_date(test_start_date)
         )
     }
+
+    #[test]
+    fn we_support_yearly_rules_properly() {
+
+    }
 }
