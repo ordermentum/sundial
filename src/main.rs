@@ -65,7 +65,7 @@ impl<'a> RRule<'a> {
 
         let mut dates_to_return: Vec<DateTime<Utc>> = Vec::new();
         let mut new_start_date = dt_start;
-        for i in 1..count {
+        for i in 0..count {
             new_start_date = self.get_next_date(new_start_date);
             dates_to_return.push(new_start_date);
         }
@@ -76,8 +76,11 @@ impl<'a> RRule<'a> {
     // standalone function that gets iterations from a single start date
     fn get_next_date(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
         let mut return_date = start_date;
+        // handle yearly
+        if self.frequency.eq("YEARLY") {
+            return_date = self.handle_yearly(start_date)
         // handle monthly
-        if self.frequency == "MONTHLY" {
+        } else if self.frequency == "MONTHLY" {
             return_date = self.handle_monthly(start_date)
         } else {
             println!("given RRule format has not been implemented yet")
@@ -159,6 +162,21 @@ impl<'a> RRule<'a> {
                     }
                 }
             }
+        }
+        next_date
+    }
+
+    // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
+    fn handle_yearly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut interval: u32 = self.interval.parse().unwrap();
+        let max_year = 2099;
+        let mut next_date = start_date;
+        let mut next_year = start_date.year() + 1;
+        for i in 0..interval {
+            if next_date.year().lt(&(max_year as i32)) {
+                next_date = next_date.with_year(next_year).unwrap()
+            }
+            next_year = next_year + 1;
         }
         next_date
     }
@@ -267,8 +285,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-
-    let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27".to_owned();
+    let s = "FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
     let mut rrule_result = RRule {
         frequency: String::from(""),
         count: String::from(""),
@@ -357,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_monthly_rrule() {
+    fn test_we_use_the_count_properly() {
         let mut rrule_result = RRule {
             frequency: String::from(""),
             count: String::from(""),
@@ -371,6 +388,29 @@ mod tests {
             by_year_day: Vec::new(),
         };
 
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
+        assert_eq!(27, rrule_result.get_next_iter_dates().len())
+    }
+
+    #[test]
+    fn test_monthly_rrule() {
+        let mut rrule_result = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+        // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
             "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
@@ -378,6 +418,30 @@ mod tests {
         let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
         assert_eq!(
             test_start_date.with_day(28).unwrap(),
+            rrule_result.get_next_date(test_start_date)
+        )
+    }
+
+    #[test]
+    fn we_support_yearly_rules_properly() {
+        let mut rrule_result = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+
+        // test we get the right next date
+        convert_to_rrule(&mut rrule_result, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
+        let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
+        assert_eq!(
+            test_start_date.with_year(2020).unwrap(),
             rrule_result.get_next_date(test_start_date)
         )
     }
