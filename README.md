@@ -17,7 +17,7 @@ Since the library is designed purely to support the [RRules section of the spec]
 
 |            | SECONDLY      | MINUTELY      | HOURLY        | DAILY         | WEEKLY        | FORTNIGHTLY   | MONTHLY       | YEARLY        |
 |------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|
-| COUNT      | []            | []            | []            | []            | []            | []            | [x]           | [x]           |
+| COUNT      | - []          | - []          | - []          | - []          | - []          | - []          | - [x]         | - [x]         |
 | INTERVAL   | []            | []            | []            | []            | []            | []            | [x]           | [x]           |
 | BYMONTH    | []            | []            | []            | []            | []            | []            | [x]           | []            |
 | BYWEEKNO   | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | []            |
@@ -32,4 +32,4 @@ Since the library is designed purely to support the [RRules section of the spec]
 * Checked boxes mean the feature is supported
 * Unchecked means feature is not supported but will be in future releases
 * N/A means the feature is not applicable for the RRule type per the spec
-* Not supported means the feature will not be support at present by this library
+* N/S means the feature will not be support at present by this library
