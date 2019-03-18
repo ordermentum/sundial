@@ -287,7 +287,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let s = "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27".to_owned();
+    let s = "FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
     let mut rrule_result = RRule {
         frequency: String::from(""),
         count: String::from(""),
@@ -427,6 +427,28 @@ mod tests {
 
     #[test]
     fn we_support_yearly_rules_properly() {
+        let mut rrule_result = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
 
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=YEARLY;COUNT=2;INTERVAL=1",
+        );
+        let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
+        assert_eq!(
+            test_start_date.with_year(2020).unwrap(),
+            rrule_result.get_next_date(test_start_date)
+        )
     }
 }
