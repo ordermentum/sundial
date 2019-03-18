@@ -27,7 +27,7 @@ Since the library is designed purely to support the [RRules section of the spec]
 | BYHOUR     | []            | []            | []            | []            | []            | []            | [x]           | []            |
 | BYMINUTE   | []            | []            | []            | []            | []            | []            | [x]           | []            |
 | BYSECOND   | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYSETPOS   | Not Supported | Not Supported | Not Supported | Not Supported | Not Supported | Not Supported | Not supported | Not Supported |
+| BYSETPOS   | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           |
 
 * Checked boxes mean the feature is supported
 * Unchecked means feature is not supported but will be in future releases
