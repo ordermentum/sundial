@@ -76,9 +76,10 @@ impl<'a> RRule<'a> {
     // standalone function that gets iterations from a single start date
     fn get_next_date(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
         let mut return_date = start_date;
-        // handle monthly
+        // handle yearly
         if self.frequency.eq("YEARLY")  {
             return_date = self.handle_yearly(start_date)
+        // handle monthly
         } else if self.frequency == "MONTHLY"  {
             return_date = self.handle_monthly(start_date)
         } else {
@@ -286,7 +287,6 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-
     let s = "FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
     let mut rrule_result = RRule {
         frequency: String::from(""),
@@ -412,7 +412,6 @@ mod tests {
             by_month_day: Vec::new(),
             by_year_day: Vec::new(),
         };
-
         // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
