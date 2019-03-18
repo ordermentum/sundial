@@ -77,10 +77,10 @@ impl<'a> RRule<'a> {
     fn get_next_date(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
         let mut return_date = start_date;
         // handle yearly
-        if self.frequency.eq("YEARLY")  {
+        if self.frequency.eq("YEARLY") {
             return_date = self.handle_yearly(start_date)
         // handle monthly
-        } else if self.frequency == "MONTHLY"  {
+        } else if self.frequency == "MONTHLY" {
             return_date = self.handle_monthly(start_date)
         } else {
             println!("given RRule format has not been implemented yet")
@@ -174,9 +174,7 @@ impl<'a> RRule<'a> {
         let mut next_year = start_date.year() + 1;
         for i in 0..interval {
             if next_date.year().lt(&(max_year as i32)) {
-                next_date = next_date
-                    .with_year(next_year)
-                    .unwrap()
+                next_date = next_date.with_year(next_year).unwrap()
             }
             next_year = next_year + 1;
         }
@@ -395,7 +393,7 @@ mod tests {
             &mut rrule_result,
             "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         );
-        assert_eq!(27,rrule_result.get_next_iter_dates().len())
+        assert_eq!(27, rrule_result.get_next_iter_dates().len())
     }
 
     #[test]
@@ -440,10 +438,7 @@ mod tests {
         };
 
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=YEARLY;COUNT=2;INTERVAL=1",
-        );
+        convert_to_rrule(&mut rrule_result, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
         let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
         assert_eq!(
             test_start_date.with_year(2020).unwrap(),
