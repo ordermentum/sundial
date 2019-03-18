@@ -17,7 +17,7 @@ Since the library is designed purely to support the [RRules section of the spec]
 
 |            | SECONDLY      | MINUTELY      | HOURLY        | DAILY         | WEEKLY        | FORTNIGHTLY   | MONTHLY       | YEARLY        |
 |------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|
-| COUNT      | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- [x]</li>| <li>- [x]</li>|
+| COUNT      | <ul><li>- []</li></ul> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- [x] YES</li>| <li>- [x]</li>|
 | INTERVAL   | []            | []            | []            | []            | []            | []            | [x]           | [x]           |
 | BYMONTH    | []            | []            | []            | []            | []            | []            | [x]           | []            |
 | BYWEEKNO   | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | []            |
