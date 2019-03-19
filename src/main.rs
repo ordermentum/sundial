@@ -3,37 +3,63 @@ extern crate pest_derive;
 
 use chrono::prelude::*;
 use pest::Parser;
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use serde_json::Result;
 use std::env;
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
 struct RRuleParser;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct RRule<'a> {
+    #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
     frequency: String,
+    #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
     count: String,
+    #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
     interval: String,
+    #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
     wkst: String,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_hour: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_minute: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_second: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_day: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_month_day: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     by_year_day: Vec<&'a str>,
+}
+
+fn default_rrule_string_field() -> String {
+    "".to_string()
+}
+
+fn default_rrule_vec_field<'a>() -> Vec<&'a str> {
+    Vec::new()
 }
 
 impl<'a> RRule<'a> {
@@ -281,6 +307,10 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
     }
 }
 
+fn generate_rrule_from_json(json: &str) -> RRule {
+    serde_json::from_str(json).unwrap()
+}
+
 // ToDo : Add validation for checking that the RRULE string was properly extracted from the parser
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
@@ -300,13 +330,14 @@ fn main() {
     };
 
     convert_to_rrule(&mut rrule_result, &s);
+    generate_rrule_from_json(rrule_result.to_json().as_ref());
     println!("next date is {}", rrule_result.get_next_date(Utc::now()));
     println!("next dates are {:?}", rrule_result.get_next_iter_dates());
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{convert_to_rrule, RRule};
+    use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
     use chrono::offset::TimeZone;
     use chrono::{Datelike, Utc};
     use serde_json::json;
@@ -445,4 +476,52 @@ mod tests {
             rrule_result.get_next_date(test_start_date)
         )
     }
+
+    #[test]
+    fn we_can_deserialize_rrule_json_succesfully_1() {
+        let mut rrule_expected_1 = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+
+        // test we get the right next date
+        convert_to_rrule(&mut rrule_expected_1, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
+        let mut rrule_1 = rrule_expected_1.to_json();
+        let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
+        assert_eq!(rrule_actual_1, rrule_expected_1);
+    }
+
+    #[test]
+    fn we_can_deserialize_rrule_json_succesfully_2() {
+        let mut rrule_expected_1 = RRule {
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_expected_1,
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
+        let mut rrule_1 = rrule_expected_1.to_json();
+        let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
+        assert_eq!(rrule_actual_1, rrule_expected_1)
+    }
+
 }
