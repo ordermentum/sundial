@@ -5,13 +5,13 @@ use chrono::prelude::*;
 use chrono::TimeZone;
 use chrono_tz::Tz;
 use chrono_tz::UTC;
-use std::str::FromStr;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 use serde_json::Result;
 use std::env;
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
@@ -115,7 +115,7 @@ impl<'a> RRule<'a> {
         // handle yearly
         if self.frequency.eq("YEARLY") {
             return_date = self.handle_yearly(start_date)
-            // handle monthly
+        // handle monthly
         } else if self.frequency == "MONTHLY" {
             return_date = self.handle_monthly(start_date)
         } else {
@@ -245,36 +245,56 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             }
 
             Rule::dtstart_expr_with_tz => {
-                // For when dtstart is timezone are
+                // For when dtstart had timezone provided
                 // Todo: Heaps of failure points here, add error handling; actually the whole filed needs it
-                let non_validated_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
-                let tz_split: Vec<&str> = non_validated_dtstart.split(":").collect();
-                if tz_split.len() > 1 {
-                    // we have time zone
-                    let tz = tz_split[0];
-                    let timezone = chrono_tz::Tz::from_str(tz).unwrap();
-                    let naive_date = NaiveDateTime::parse_from_str(tz_split[1], "%Y%m%dT%H%M%S").unwrap();
-                    rrule_result.dtstart = timezone.from_local_datetime(&naive_date).unwrap();
-                } else {
-                    panic!("Invalid DTSTART;TZID string {}", non_validated_dtstart)
+                if rrule_result.dtstart.is_empty() {
+                    // only one instance of dtStart is allowed and according to
+                    // the spec any errors should be silently dropped when parsing
+                    let non_validated_dtstart: String =
+                        line.into_inner().next().unwrap().as_str().to_string();
+                    let tz_split: Vec<&str> = non_validated_dtstart.split(":").collect();
+                    if tz_split.len() > 1 {
+                        // we have time zone
+                        let tz = tz_split[0];
+                        let timezone = chrono_tz::Tz::from_str(tz).unwrap();
+                        let naive_date =
+                            NaiveDateTime::parse_from_str(tz_split[1], "%Y%m%dT%H%M%S").unwrap();
+                        rrule_result.dtstart = timezone
+                            .from_local_datetime(&naive_date)
+                            .unwrap()
+                            .to_string();
+                    } else {
+                        panic!("Invalid DTSTART;TZID string {}", non_validated_dtstart)
+                    }
                 }
             }
 
             Rule::dtstart_expr_without_tz => {
-                let mut non_validated_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
-                if non_validated_dtstart.contains("Z") {
-                    non_validated_dtstart.truncate((non_validated_dtstart.len() - 1) as usize);
-                    let naive_date = NaiveDateTime::parse_from_str(non_validated_dtstart.as_ref(), "%Y%m%dT%H%M%S%");
-                    rrule_result.dtstart = chrono_tz::UTC.from_local_datetime(&naive_date);
-                } else {
-                    if rrule_result.tzid.is_empty() {
-                        // no tzId specified, use UTC
-                        let naive_date = NaiveDateTime::parse_from_str(non_validated_dtstart.as_ref(), "%Y%m%dT%H%M%S%");
-                        rrule_result.dtstart = chrono_tz::UTC.from_local_datetime(&naive_date);
+                // assume UTC if not provided
+                if rrule_result.dtstart.is_empty() {
+                    let mut non_validated_dtstart: String =
+                        line.into_inner().next().unwrap().as_str().to_string();
+                    if non_validated_dtstart.contains("Z") {
+                        let naive_date =
+                            NaiveDateTime::parse_from_str(&non_validated_dtstart, "%Y%m%dT%H%M%SZ")
+                                .unwrap();
+                        rrule_result.dtstart = chrono_tz::UTC
+                            .from_local_datetime(&naive_date)
+                            .unwrap()
+                            .to_string();
                     } else {
-                        let timezone = chrono_tz::Tz::from_str(rrule_result.tzid).unwrap();
-                        let naive_date = NaiveDateTime::parse_from_str(tz_split[1], "%Y%m%dT%H%M%S").unwrap();
-                        rrule_result.dtstart = timezone.from_local_datetime(&naive_date).unwrap();
+                        if rrule_result.tzid.is_empty() {
+                            // no tzId specified, use UTC
+                            let naive_date = NaiveDateTime::parse_from_str(
+                                &non_validated_dtstart,
+                                "%Y%m%dT%H%M%S",
+                            )
+                            .unwrap();
+                            rrule_result.dtstart = chrono_tz::UTC
+                                .from_local_datetime(&naive_date)
+                                .unwrap()
+                                .to_string();
+                        }
                     }
                 }
             }
@@ -367,7 +387,7 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "DTSTART;TZID=Australia/Sydney:19970714T133000;FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
+    let s = "DTSTART=19970714T133000;FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27;TZID=Australia/Sydney".to_owned();
     let mut rrule_result = RRule {
         tzid: String::from(""),
         dtstart: String::from(""),
