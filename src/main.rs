@@ -2,6 +2,10 @@
 extern crate pest_derive;
 
 use chrono::prelude::*;
+use chrono::TimeZone;
+use chrono_tz::Tz;
+use chrono_tz::UTC;
+use std::str::FromStr;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
@@ -16,6 +20,9 @@ struct RRuleParser;
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct RRule<'a> {
+    #[serde(default = "default_rrule_string_field")]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    dtstart: String,
     #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
     frequency: String,
@@ -227,6 +234,20 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 
     for line in parse_result.into_inner() {
         match line.as_rule() {
+            Rule::dtstart_expr => {
+                let non_validates_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
+                let tz_split: Vec<&str> = non_validates_dtstart.split(":").collect();
+                if tz_split.len() > 1 {
+                    // we have time zone
+                    let tz = tz_split[0];
+                    let timezone = chrono_tz::Tz::from_str(tz);
+                    println!("Timezone is {:?}", timezone);
+//                    let date_time: DateTime<Tz> = tz_split[1].parse_from_str();
+                } else {
+
+                }
+
+            }
             Rule::freq_expr => {
                 rrule_result.frequency = line.into_inner().next().unwrap().as_str().to_string();
             }
@@ -315,8 +336,9 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
+    let s = "DTSTART=America/New_York:19970714T133000;FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
     let mut rrule_result = RRule {
+        dtstart: String::from(""),
         frequency: String::from(""),
         count: String::from(""),
         interval: String::from(""),
@@ -330,9 +352,8 @@ fn main() {
     };
 
     convert_to_rrule(&mut rrule_result, &s);
-    generate_rrule_from_json(rrule_result.to_json().as_ref());
-    println!("next date is {}", rrule_result.get_next_date(Utc::now()));
-    println!("next dates are {:?}", rrule_result.get_next_iter_dates());
+
+    println!("Rrule is {:?}", rrule_result.to_json())
 }
 
 #[cfg(test)]
@@ -386,6 +407,7 @@ mod tests {
 
         for i in &rrule_test_cases {
             let mut rrule_result = RRule {
+                dtstart: String::from(""),
                 frequency: String::from(""),
                 count: String::from(""),
                 interval: String::from(""),
@@ -407,6 +429,7 @@ mod tests {
     #[test]
     fn test_we_use_the_count_properly() {
         let mut rrule_result = RRule {
+            dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
@@ -430,6 +453,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule() {
         let mut rrule_result = RRule {
+            dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
@@ -456,6 +480,7 @@ mod tests {
     #[test]
     fn we_support_yearly_rules_properly() {
         let mut rrule_result = RRule {
+            dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
@@ -480,6 +505,7 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_1() {
         let mut rrule_expected_1 = RRule {
+            dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
@@ -502,6 +528,7 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
         let mut rrule_expected_1 = RRule {
+            dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
