@@ -5,7 +5,8 @@ expr = {  ((recur_exprs)+)? }
 
 recur_exprs = _{ (recur_expr ~ ";") | recur_expr }
 
-recur_expr = _{ dtstart_expr |
+recur_expr = _{ dtstart_expr_with_tz |
+                dtstart_expr_without_tz |
                 freq_expr |
                 interval_expr |
                 count_expr |
@@ -15,14 +16,15 @@ recur_expr = _{ dtstart_expr |
                 byday_expr |
                 bymonthday_expr |
                 byyearday_expr |
-                wkst_expr }
+                wkst_expr |
+                tz_expr }
 
-dtstart_expr = { "DTSTART=" ~ dtstart_field }
-dtstart_field = { dtstart_field_with_tz | dtstart_field_without_tz }
+dtstart_expr_with_tz = { "DTSTART;TZID=" ~ dtstart_field_with_tz }
+dtstart_expr_without_tz = { "DTSTART=" ~ dtstart_field_without_tz }
+dtstart_field_with_tz  = { dtstart_tz_with_underscore | dtstart_tz_without_underscore }
+dtstart_field_without_tz = { ASCII_ALPHANUMERIC* }
 dtstart_tz_with_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ "_" ~ ASCII_ALPHA * ~ ":" ~ ASCII_ALPHANUMERIC* }
 dtstart_tz_without_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ ":" ~ ASCII_ALPHANUMERIC* }
-dtstart_field_with_tz  = _{ dtstart_tz_with_underscore | dtstart_tz_without_underscore }
-dtstart_field_without_tz = _{ ASCII_ALPHANUMERIC* }
 
 freq_expr = { "FREQ=" ~ freq_field }
 freq_field = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }
@@ -85,3 +87,7 @@ byyearday_expr = { "BYYEARDAY=" ~ byyearday_field }
 
 wkst_field = @{ weekday }
 wkst_expr = { "WKST=" ~ weekday }
+
+tz_field = { (ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ "_" ~ ASCII_ALPHA *) |
+             (ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA*) }
+tz_expr = { "TZID=" ~ tz_field }

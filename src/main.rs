@@ -22,6 +22,9 @@ struct RRuleParser;
 struct RRule<'a> {
     #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
+    tzid: String,
+    #[serde(default = "default_rrule_string_field")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     dtstart: String,
     #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -112,7 +115,7 @@ impl<'a> RRule<'a> {
         // handle yearly
         if self.frequency.eq("YEARLY") {
             return_date = self.handle_yearly(start_date)
-        // handle monthly
+            // handle monthly
         } else if self.frequency == "MONTHLY" {
             return_date = self.handle_monthly(start_date)
         } else {
@@ -234,20 +237,48 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
 
     for line in parse_result.into_inner() {
         match line.as_rule() {
-            Rule::dtstart_expr => {
-                let non_validates_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
-                let tz_split: Vec<&str> = non_validates_dtstart.split(":").collect();
+            Rule::tz_expr => {
+                // parse timezone
+                let tz_unparsed = line.into_inner().next().unwrap().as_str().to_string();
+                // ToDo: add a check using chrono time zone to check if the timezone is parseable
+                rrule_result.tzid = tz_unparsed;
+            }
+
+            Rule::dtstart_expr_with_tz => {
+                // For when dtstart is timezone are
+                // Todo: Heaps of failure points here, add error handling; actually the whole filed needs it
+                let non_validated_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
+                let tz_split: Vec<&str> = non_validated_dtstart.split(":").collect();
                 if tz_split.len() > 1 {
                     // we have time zone
                     let tz = tz_split[0];
-                    let timezone = chrono_tz::Tz::from_str(tz);
-                    println!("Timezone is {:?}", timezone);
-//                    let date_time: DateTime<Tz> = tz_split[1].parse_from_str();
+                    let timezone = chrono_tz::Tz::from_str(tz).unwrap();
+                    let naive_date = NaiveDateTime::parse_from_str(tz_split[1], "%Y%m%dT%H%M%S").unwrap();
+                    rrule_result.dtstart = timezone.from_local_datetime(&naive_date).unwrap();
                 } else {
-
+                    panic!("Invalid DTSTART;TZID string {}", non_validated_dtstart)
                 }
-
             }
+
+            Rule::dtstart_expr_without_tz => {
+                let mut non_validated_dtstart: String = line.into_inner().next().unwrap().as_str().to_string();
+                if non_validated_dtstart.contains("Z") {
+                    non_validated_dtstart.truncate((non_validated_dtstart.len() - 1) as usize);
+                    let naive_date = NaiveDateTime::parse_from_str(non_validated_dtstart.as_ref(), "%Y%m%dT%H%M%S%");
+                    rrule_result.dtstart = chrono_tz::UTC.from_local_datetime(&naive_date);
+                } else {
+                    if rrule_result.tzid.is_empty() {
+                        // no tzId specified, use UTC
+                        let naive_date = NaiveDateTime::parse_from_str(non_validated_dtstart.as_ref(), "%Y%m%dT%H%M%S%");
+                        rrule_result.dtstart = chrono_tz::UTC.from_local_datetime(&naive_date);
+                    } else {
+                        let timezone = chrono_tz::Tz::from_str(rrule_result.tzid).unwrap();
+                        let naive_date = NaiveDateTime::parse_from_str(tz_split[1], "%Y%m%dT%H%M%S").unwrap();
+                        rrule_result.dtstart = timezone.from_local_datetime(&naive_date).unwrap();
+                    }
+                }
+            }
+
             Rule::freq_expr => {
                 rrule_result.frequency = line.into_inner().next().unwrap().as_str().to_string();
             }
@@ -336,8 +367,9 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "DTSTART=America/New_York:19970714T133000;FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
+    let s = "DTSTART;TZID=Australia/Sydney:19970714T133000;FREQ=YEARLY;COUNT=2;INTERVAL=1".to_owned();
     let mut rrule_result = RRule {
+        tzid: String::from(""),
         dtstart: String::from(""),
         frequency: String::from(""),
         count: String::from(""),
@@ -407,6 +439,7 @@ mod tests {
 
         for i in &rrule_test_cases {
             let mut rrule_result = RRule {
+                tzid: String::from(""),
                 dtstart: String::from(""),
                 frequency: String::from(""),
                 count: String::from(""),
@@ -429,6 +462,7 @@ mod tests {
     #[test]
     fn test_we_use_the_count_properly() {
         let mut rrule_result = RRule {
+            tzid: String::from(""),
             dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
@@ -453,6 +487,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule() {
         let mut rrule_result = RRule {
+            tzid: String::from(""),
             dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
@@ -480,6 +515,7 @@ mod tests {
     #[test]
     fn we_support_yearly_rules_properly() {
         let mut rrule_result = RRule {
+            tzid: String::from(""),
             dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
@@ -505,6 +541,7 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_1() {
         let mut rrule_expected_1 = RRule {
+            tzid: String::from(""),
             dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
@@ -528,6 +565,7 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
         let mut rrule_expected_1 = RRule {
+            tzid: String::from(""),
             dtstart: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
@@ -550,5 +588,4 @@ mod tests {
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
         assert_eq!(rrule_actual_1, rrule_expected_1)
     }
-
 }
