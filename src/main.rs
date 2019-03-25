@@ -260,8 +260,8 @@ impl<'a> RRule<'a> {
             .unwrap_or(&panic_value)
             .to_owned();
 
-        // go crazy we don't like this
         if by_day.eq("PA") {
+            // go crazy we don't like this
             panic!("Need a byDay rrule part when evaluation rules with weekly freq")
         } else {
             // now adjust the date to match the start day
@@ -272,10 +272,8 @@ impl<'a> RRule<'a> {
 
         let mut interval: u32 = self.interval.parse().unwrap();
         let mut next_date = start_date_with_intervals;
-        let mut next_day = start_date_with_intervals.day() + 7;
         for i in 0..interval {
-            next_date = next_date.with_day(next_day).unwrap();
-            next_day = next_day + 7;
+            next_date = next_date + Duration::days(7);
         }
         next_date
     }
@@ -288,9 +286,9 @@ impl<'a> RRule<'a> {
     /// the rule is 20180326T160000 based on lets say the bySecond property being 0, then the
     /// date is in the future and we should use next tuesday as the start date instead of the
     /// current tuesday
-    fn calculate_weekday_distance(&self, bywk_day: &str,  current_weekday: Weekday, in_future_from_current_day: bool) -> u32 {
+    fn calculate_weekday_distance(&self, bywk_day: &str,  current_weekday: Weekday, in_future_from_current_day: bool) -> i64 {
         let number_from_mon = current_weekday.number_from_monday();
-        let mut adjustment: u32 = 0;
+        let mut adjustment: i64 = 0;
         match bywk_day {
             "MO" => {
                 match number_from_mon {
@@ -875,5 +873,12 @@ mod tests {
         let mut rrule_1 = rrule_expected_1.to_json();
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
         assert_eq!(rrule_actual_1, rrule_expected_1)
+    }
+
+    #[test]
+    fn test_wtih_day() {
+        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
+        let next_date = test_start_date + Duration::days(38);
+        assert_eq!(next_date, test_start_date);
     }
 }
