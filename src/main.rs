@@ -2,7 +2,7 @@
 extern crate pest_derive;
 
 use chrono::prelude::*;
-use chrono::{Duration,TimeZone};
+use chrono::{Duration, TimeZone};
 use chrono_tz::Tz;
 use chrono_tz::UTC;
 use pest::Parser;
@@ -112,7 +112,8 @@ impl<'a> RRule<'a> {
         let mut start_date = if self.dtstart.is_empty() {
             Utc::now()
         } else {
-            Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S").unwrap() as DateTime<Utc>
+            Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S")
+                .unwrap() as DateTime<Utc>
         };
 
         let mut count: i8 = 52; // default count of iterations to build
@@ -166,7 +167,7 @@ impl<'a> RRule<'a> {
             if !self.by_second.is_empty() {
                 second = self.by_second.first().unwrap().parse().unwrap();
             }
-            start_date_with_intervals.with_second(second);
+            start_date_with_intervals = start_date_with_intervals.with_second(second).unwrap();
         }
 
         if self.frequency.ne("SECONDLY") && self.frequency.ne("MONTHLY") {
@@ -174,7 +175,7 @@ impl<'a> RRule<'a> {
             if !self.by_minute.is_empty() {
                 minute = self.by_minute.first().unwrap().parse().unwrap();
             }
-            start_date_with_intervals.with_minute(minute);
+            start_date_with_intervals = start_date_with_intervals.with_minute(minute).unwrap();
         }
 
         if self.frequency.ne("SECONDLY")
@@ -185,7 +186,7 @@ impl<'a> RRule<'a> {
             if !self.by_hour.is_empty() {
                 hour = self.by_hour.first().unwrap().parse().unwrap();
             }
-            start_date_with_intervals.with_hour(hour);
+            start_date_with_intervals = start_date_with_intervals.with_hour(hour).unwrap();
         }
 
         start_date_with_intervals
@@ -264,9 +265,13 @@ impl<'a> RRule<'a> {
         let panic_value = "PA";
         // use 50 as panic day as it resides outside the bound of permissible parse range for byMonthDay
         // expression
-        let by_day = self.by_day
+        let by_day = self
+            .by_day
             .first()
-            .unwrap_or(&chrono_weekday_to_rrule_byday(start_date.weekday(), panic_value))
+            .unwrap_or(&chrono_weekday_to_rrule_byday(
+                start_date.weekday(),
+                panic_value,
+            ))
             .to_owned();
 
         if by_day.eq("PA") {
@@ -275,7 +280,8 @@ impl<'a> RRule<'a> {
         } else {
             // now adjust the date to match the start day
             let in_future = start_date_with_intervals.gt(&start_date);
-            let days_to_adjust = self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
+            let days_to_adjust =
+                self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
             start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
 
             let mut interval: u32 = self.interval.parse().unwrap();
@@ -283,7 +289,8 @@ impl<'a> RRule<'a> {
             for i in 0..interval {
                 next_date = next_date + Duration::days(7);
             }
-            let final_days_to_adjust = self.calculate_weekday_distance(by_day, next_date.weekday(), false);
+            let final_days_to_adjust =
+                self.calculate_weekday_distance(by_day, next_date.weekday(), false);
             // do a final adjustment in case we are going over monthly boundaries
             // and the calculated date day does not coincide with the one provided
             // by the client
@@ -300,7 +307,12 @@ impl<'a> RRule<'a> {
     /// the rule is 20180326T160000 based on lets say the bySecond property being 0, then the
     /// date is in the future and we should use next tuesday as the start date instead of the
     /// current tuesday
-    fn calculate_weekday_distance(&self, bywk_day: &str,  current_weekday: Weekday, in_future_from_current_day: bool) -> i64 {
+    fn calculate_weekday_distance(
+        &self,
+        bywk_day: &str,
+        current_weekday: Weekday,
+        in_future_from_current_day: bool,
+    ) -> i64 {
         let number_from_mon = current_weekday.number_from_monday();
         let mut adjustment: i64 = 0;
         match bywk_day {
@@ -338,7 +350,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 1;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "TU" => {
@@ -375,7 +387,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 2;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "WE" => {
@@ -412,7 +424,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 3;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "TH" => {
@@ -449,7 +461,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 4;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "FR" => {
@@ -486,7 +498,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 5;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "SA" => {
@@ -523,7 +535,7 @@ impl<'a> RRule<'a> {
                         // sunday
                         adjustment = 6;
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
             "SU" => {
@@ -560,10 +572,10 @@ impl<'a> RRule<'a> {
                             adjustment = 0;
                         }
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
-            _ => { }
+            _ => {}
         }
         adjustment
     }
@@ -600,7 +612,10 @@ fn chrono_weekday_to_rrule_byday(weekday: Weekday, panic_value: &str) -> &str {
 /// forward from, this function
 /// selects the dates that are strictly in the future and returns a modified list
 /// with past dates removed.
-fn lens_iter_dates(dates_list: Vec<DateTime<Utc>>, lens_from_date: DateTime<Utc>) -> Vec<DateTime<Utc>> {
+fn lens_iter_dates(
+    dates_list: Vec<DateTime<Utc>>,
+    lens_from_date: DateTime<Utc>,
+) -> Vec<DateTime<Utc>> {
     let mut lensed_dates_list: Vec<DateTime<Utc>> = Vec::new();
     for date in dates_list.iter() {
         if date.gt(&lens_from_date) {
@@ -663,7 +678,6 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             }
 
             Rule::dtstart_expr_without_tz => {
-                println!("checking dtstart, current is {:?}", rrule_result.dtstart);
                 // assume UTC if not provided
                 if rrule_result.dtstart.is_empty() {
                     let mut non_validated_dtstart: String =
@@ -672,16 +686,13 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
                         let naive_date =
                             NaiveDateTime::parse_from_str(&non_validated_dtstart, "%Y%m%dT%H%M%SZ")
                                 .unwrap();
-                        println!("setting dtstart");
                         rrule_result.dtstart = naive_date.to_string();
                     } else {
-                            // no tzId specified, use UTC
-                            let naive_date = NaiveDateTime::parse_from_str(
-                                &non_validated_dtstart,
-                                "%Y%m%dT%H%M%S",
-                            )
-                            .unwrap();
-                            rrule_result.dtstart = naive_date.to_string();
+                        // no tzId specified, use UTC
+                        let naive_date =
+                            NaiveDateTime::parse_from_str(&non_validated_dtstart, "%Y%m%dT%H%M%S")
+                                .unwrap();
+                        rrule_result.dtstart = naive_date.to_string();
                     }
                 }
             }
@@ -774,7 +785,8 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYMINUTE=0;TZID=Australia/West;DTSTART=20190101T030000".to_owned();
+    let s =
+        "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;TZID=Australia/West;DTSTART=20190101T030000".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
@@ -787,7 +799,7 @@ fn main() {
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
     use chrono::offset::TimeZone;
-    use chrono::{Duration, Datelike, Utc, Weekday};
+    use chrono::{Datelike, Duration, Timelike, Utc, Weekday};
     use serde_json::json;
 
     struct RRuleTestCase<'a> {
@@ -884,14 +896,46 @@ mod tests {
     #[test]
     fn test_fortnightly_rrules_fall_on_the_day_specified() {
         let mut rrule_result = RRule::new();
+
+        // test case group 1 - implicit by day from dtStart
         convert_to_rrule(
             &mut rrule_result,
-            "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYMINUTE=0;TZID=Australia/West;DTSTART=20190101T030000",
+            "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500",
         );
         let mut iter_dates = rrule_result.get_all_iter_dates();
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
-            assert_eq!(Weekday::Tue, date.weekday())
+            assert_eq!(Weekday::Tue, date.weekday());
+            assert_eq!(00, date.hour());
+            assert_eq!(15, date.minute());
+            assert_eq!(48, date.second());
+        }
+
+        rrule_result = RRule::new();
+
+        convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
+        iter_dates = rrule_result.get_all_iter_dates();
+        for date in iter_dates.iter() {
+            println!("Checking for date {:?}", date);
+            assert_eq!(Weekday::Thu, date.weekday());
+            assert_eq!(17, date.hour());
+            assert_eq!(00, date.minute());
+            assert_eq!(03, date.second());
+        }
+
+        rrule_result = RRule::new();
+        // test case 2 - explicit by day
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;TZID=Australia/West;DTSTART=20190101T030000",
+        );
+        let mut iter_dates = rrule_result.get_all_iter_dates();
+        for date in iter_dates.iter() {
+            println!("Checking for date {:?}", date);
+            assert_eq!(Weekday::Fri, date.weekday());
+            assert_eq!(03, date.hour());
+            assert_eq!(00, date.minute());
+            assert_eq!(00, date.second());
         }
     }
 
@@ -948,10 +992,10 @@ mod tests {
         assert_eq!(rrule_actual_1, rrule_expected_1)
     }
 
-//    #[test]
-//    fn test_wtih_day() {
-//        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
-//        let next_date = test_start_date + Duration::days(38);
-//        assert_eq!(next_date, test_start_date);
-//    }
+    //    #[test]
+    //    fn test_wtih_day() {
+    //        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
+    //        let next_date = test_start_date + Duration::days(38);
+    //        assert_eq!(next_date, test_start_date);
+    //    }
 }
