@@ -158,3 +158,6 @@ Etc/UTC
 Europe/Moscow
 Etc/UTC
 ```
+
+### Useful Resources
+- [RRule Demo](https://jakubroztocil.github.io/rrule/)

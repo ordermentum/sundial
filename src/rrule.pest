@@ -88,6 +88,7 @@ byyearday_expr = { "BYYEARDAY=" ~ byyearday_field }
 wkst_field = @{ weekday }
 wkst_expr = { "WKST=" ~ weekday }
 
+tz_expr = { "TZID=" ~ tz_field }
 tz_field = { (ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ "_" ~ ASCII_ALPHA *) |
              (ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA*) }
-tz_expr = { "TZID=" ~ tz_field }
+
