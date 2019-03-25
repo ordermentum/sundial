@@ -2,7 +2,7 @@
 extern crate pest_derive;
 
 use chrono::prelude::*;
-use chrono::TimeZone;
+use chrono::{Duration,TimeZone};
 use chrono_tz::Tz;
 use chrono_tz::UTC;
 use pest::Parser;
@@ -73,6 +73,30 @@ fn default_rrule_vec_field<'a>() -> Vec<&'a str> {
 }
 
 impl<'a> RRule<'a> {
+    /// Generates a new empty RRule instance
+    ///
+    /// Example:
+    /// ```
+    /// let rrule = RRule::new();
+    /// ```
+    #[inline]
+    pub fn new<'b>() -> RRule<'b> {
+        return RRule {
+            tzid: String::from(""),
+            dtstart: String::from(""),
+            frequency: String::from(""),
+            count: String::from(""),
+            interval: String::from(""),
+            wkst: String::from(""),
+            by_hour: Vec::new(),
+            by_minute: Vec::new(),
+            by_second: Vec::new(),
+            by_day: Vec::new(),
+            by_month_day: Vec::new(),
+            by_year_day: Vec::new(),
+        };
+    }
+
     fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
@@ -125,7 +149,7 @@ impl<'a> RRule<'a> {
     }
 
     // set the lower interval time for start date
-    fn set_initial_time_intervals(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn with_initial_time_intervals(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
         let mut start_date_with_intervals = start_date;
 
         if self.frequency.ne("SECONDLY") {
@@ -183,7 +207,7 @@ impl<'a> RRule<'a> {
                     next_date = month_added.with_day(month_day).unwrap();
                 }
             } else if start_date_day == month_day {
-                let start_date_with_intervals = self.set_initial_time_intervals(start_date);
+                let start_date_with_intervals = self.with_initial_time_intervals(start_date);
 
                 // even if its the same day, if we've shot past the time, we will need to schedule
                 // for next month
@@ -216,6 +240,321 @@ impl<'a> RRule<'a> {
         }
         next_date
     }
+
+    /// Handles both weekly and special variants of weekly such as [FREQ=WEEKLY;INTERVAL=2;]
+    /// which can colloquially evaluate to fortnightly.
+    /// Pseudo Code (Todo: Delete Later)
+    /// -- for only one byWeekDay
+    /// adjust start_date day to match the byweekday
+    /// for i in 0..interval
+    ///     add 7 days to the current_date
+    ///     if not(check if it falls on the right byWkDay) -> adjust to the right wkday
+    fn handle_weekly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
+        // adjust start_date if it does not start on the start
+        let panic_value = "PA";
+        // use 50 as panic day as it resides outside the bound of permissible parse range for byMonthDay
+        // expression
+        let by_day = self.by_day
+            .first()
+            .unwrap_or(&panic_value)
+            .to_owned();
+
+        // go crazy we don't like this
+        if by_day.eq("PA") {
+            panic!("Need a byDay rrule part when evaluation rules with weekly freq")
+        } else {
+            // now adjust the date to match the start day
+            let in_future = start_date_with_intervals.gt(&start_date);
+            let days_to_adjust = self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
+            start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
+        }
+
+        let mut interval: u32 = self.interval.parse().unwrap();
+        let mut next_date = start_date_with_intervals;
+        let mut next_day = start_date_with_intervals.day() + 7;
+        for i in 0..interval {
+            next_date = next_date.with_day(next_day).unwrap();
+            next_day = next_day + 7;
+        }
+        next_date
+    }
+
+    /// Calculates the weekdays to add based on the given byweekday and current weekday.
+    /// Use the `in_future_from_current_day` property to determine whether we should use the
+    /// current day or the day in future.
+    /// A simple example is, lets say the byWkDay is `TU` and current weekday is also `Tuesday`
+    /// however, the `DTSTART` of the rule is 20180326T160003 but the complete dtStart for the
+    /// the rule is 20180326T160000 based on lets say the bySecond property being 0, then the
+    /// date is in the future and we should use next tuesday as the start date instead of the
+    /// current tuesday
+    fn calculate_weekday_distance(&self, bywk_day: &str,  current_weekday: Weekday, in_future_from_current_day: bool) -> u32 {
+        let number_from_mon = current_weekday.number_from_monday();
+        let mut adjustment: u32 = 0;
+        match bywk_day {
+            "MO" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 6;
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 5;
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 4;
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 3;
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 2;
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 1;
+                    }
+                    _ => { }
+                }
+            }
+            "TU" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 1;
+                    }
+                    2 => {
+                        // tuesday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 6;
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 5;
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 4;
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 3;
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 2;
+                    }
+                    _ => { }
+                }
+            }
+            "WE" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 2;
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 1;
+                    }
+                    3 => {
+                        // wednesday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 6;
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 5;
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 4;
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 3;
+                    }
+                    _ => { }
+                }
+            }
+            "TH" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 3;
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 2;
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 1;
+                    }
+                    4 => {
+                        // thursday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 6;
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 5;
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 4;
+                    }
+                    _ => { }
+                }
+            }
+            "FR" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 4;
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 3;
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 2;
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 1;
+                    }
+                    5 => {
+                        // friday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 6;
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 5;
+                    }
+                    _ => { }
+                }
+            }
+            "SA" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 5;
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 4;
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 3;
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 2;
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 1;
+                    }
+                    6 => {
+                        // saturday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    7 => {
+                        // sunday
+                        adjustment = 6;
+                    }
+                    _ => { }
+                }
+            }
+            "SU" => {
+                match number_from_mon {
+                    1 => {
+                        // monday
+                        adjustment = 6;
+                    }
+                    2 => {
+                        // tuesday
+                        adjustment = 5;
+                    }
+                    3 => {
+                        // wednesday
+                        adjustment = 4;
+                    }
+                    4 => {
+                        // thursday
+                        adjustment = 3;
+                    }
+                    5 => {
+                        // friday
+                        adjustment = 2;
+                    }
+                    6 => {
+                        // saturday
+                        adjustment = 1;
+                    }
+                    7 => {
+                        // sunday
+                        if in_future_from_current_day {
+                            adjustment = 7;
+                        } else {
+                            adjustment = 0;
+                        }
+                    }
+                    _ => { }
+                }
+            }
+            _ => { }
+        }
+        adjustment
+    }
 }
 
 /// error occurred when parsing user input
@@ -227,8 +566,9 @@ pub struct ParseError {
 
 use pest::iterators::Pair;
 use std::collections::HashMap;
+use std::time::Duration;
 
-/// converts and rrule string to a rrule struct
+/// Converts and rrule string to a rrule struct
 fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
     let parse_result = RRuleParser::parse(Rule::expr, rrule_string)
         .expect("unsuccessful parse") // unwrap the parse result
@@ -388,21 +728,7 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let s = "DTSTART=19970714T133000Z;FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27;TZID=Australia/Sydney".to_owned();
-    let mut rrule_result = RRule {
-        tzid: String::from(""),
-        dtstart: String::from(""),
-        frequency: String::from(""),
-        count: String::from(""),
-        interval: String::from(""),
-        wkst: String::from(""),
-        by_hour: Vec::new(),
-        by_minute: Vec::new(),
-        by_second: Vec::new(),
-        by_day: Vec::new(),
-        by_month_day: Vec::new(),
-        by_year_day: Vec::new(),
-    };
-
+    let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
     println!("Rrule is {:?}", rrule_result.to_json())
@@ -412,7 +738,7 @@ fn main() {
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
     use chrono::offset::TimeZone;
-    use chrono::{Datelike, Utc};
+    use chrono::{Duration,Datelike, Utc};
     use serde_json::json;
 
     struct RRuleTestCase<'a> {
@@ -478,20 +804,7 @@ mod tests {
         ];
 
         for i in &rrule_test_cases {
-            let mut rrule_result = RRule {
-                tzid: String::from(""),
-                dtstart: String::from(""),
-                frequency: String::from(""),
-                count: String::from(""),
-                interval: String::from(""),
-                wkst: String::from(""),
-                by_hour: Vec::new(),
-                by_minute: Vec::new(),
-                by_second: Vec::new(),
-                by_day: Vec::new(),
-                by_month_day: Vec::new(),
-                by_year_day: Vec::new(),
-            };
+            let mut rrule_result = RRule::new();
 
             convert_to_rrule(&mut rrule_result, i.rrule_string);
 
@@ -501,20 +814,7 @@ mod tests {
 
     #[test]
     fn test_we_use_the_count_properly() {
-        let mut rrule_result = RRule {
-            tzid: String::from(""),
-            dtstart: String::from(""),
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            wkst: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        let mut rrule_result = RRule::new();
 
         // test we get the right next date
         convert_to_rrule(
@@ -526,20 +826,7 @@ mod tests {
 
     #[test]
     fn test_monthly_rrule() {
-        let mut rrule_result = RRule {
-            tzid: String::from(""),
-            dtstart: String::from(""),
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            wkst: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        let mut rrule_result = RRule::new();
         // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
@@ -554,20 +841,7 @@ mod tests {
 
     #[test]
     fn we_support_yearly_rules_properly() {
-        let mut rrule_result = RRule {
-            tzid: String::from(""),
-            dtstart: String::from(""),
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            wkst: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        let mut rrule_result = RRule::new();
 
         // test we get the right next date
         convert_to_rrule(&mut rrule_result, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
@@ -580,20 +854,7 @@ mod tests {
 
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_1() {
-        let mut rrule_expected_1 = RRule {
-            tzid: String::from(""),
-            dtstart: String::from(""),
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            wkst: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        let mut rrule_expected_1 = RRule::new();
 
         // test we get the right next date
         convert_to_rrule(&mut rrule_expected_1, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
@@ -604,20 +865,7 @@ mod tests {
 
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
-        let mut rrule_expected_1 = RRule {
-            tzid: String::from(""),
-            dtstart: String::from(""),
-            frequency: String::from(""),
-            count: String::from(""),
-            interval: String::from(""),
-            wkst: String::from(""),
-            by_hour: Vec::new(),
-            by_minute: Vec::new(),
-            by_second: Vec::new(),
-            by_day: Vec::new(),
-            by_month_day: Vec::new(),
-            by_year_day: Vec::new(),
-        };
+        let mut rrule_expected_1 = RRule::new();
 
         // test we get the right next date
         convert_to_rrule(
