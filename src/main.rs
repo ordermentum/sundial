@@ -139,9 +139,10 @@ impl<'a> RRule<'a> {
         // handle yearly
         if self.frequency.eq("YEARLY") {
             return_date = self.handle_yearly(start_date)
-        // handle monthly
         } else if self.frequency == "MONTHLY" {
             return_date = self.handle_monthly(start_date)
+        } else if self.frequency == "WEEKLY" {
+            return_date = self.handle_weekly(start_date)
         } else {
             println!("given RRule format has not been implemented yet")
         }
@@ -275,6 +276,11 @@ impl<'a> RRule<'a> {
         for i in 0..interval {
             next_date = next_date + Duration::days(7);
         }
+        let final_days_to_adjust = self.calculate_weekday_distance(by_day, next_date.weekday(), false);
+        // do a final adjustment in case we are going over monthly boundaries
+        // and the calculated date day does not coincide with the one provided
+        // by the client
+        next_date = next_date + Duration::days(final_days_to_adjust);
         next_date
     }
 
@@ -725,11 +731,12 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "DTSTART=19970714T133000Z;FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27;TZID=Australia/Sydney".to_owned();
+    let s = "FREQ=WEEKLY;INTERVAL=2;COUNT=12;BYDAY=FR".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
-    println!("Rrule is {:?}", rrule_result.to_json())
+    println!("Rrule is {:?}", rrule_result.to_json());
+    println!("Next dates are {:?}", rrule_result.get_next_iter_dates())
 }
 
 #[cfg(test)]
@@ -820,6 +827,12 @@ mod tests {
             "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         );
         assert_eq!(27, rrule_result.get_next_iter_dates().len())
+    }
+
+    #[test]
+    fn test_fortnightly_rrules() {
+        let mut rrule_result = RRule::new();
+
     }
 
     #[test]
