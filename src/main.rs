@@ -107,9 +107,14 @@ impl<'a> RRule<'a> {
 
     // show me the money
     // parent function that can get a list of all future iterations based on count
-    fn get_next_iter_dates(&self) -> Vec<DateTime<Utc>> {
-        // ToDo: need to add dtStart to parser and don't assume today as the starting date
-        let dt_start = Utc::now();
+    fn get_all_iter_dates(&self) -> Vec<DateTime<Utc>> {
+        // ToDo: Need to respect timezones and not assume UTC
+        let mut start_date = if self.dtstart.is_empty() {
+            Utc::now()
+        } else {
+            Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S").unwrap() as DateTime<Utc>
+        };
+
         let mut count: i8 = 52; // default count of iterations to build
 
         // assign default weekstart and reassign if present
@@ -123,14 +128,17 @@ impl<'a> RRule<'a> {
             count = self.count.parse().unwrap()
         }
 
-        let mut dates_to_return: Vec<DateTime<Utc>> = Vec::new();
-        let mut new_start_date = dt_start;
+        let mut next_dates_list: Vec<DateTime<Utc>> = Vec::new();
+        let mut next_date = start_date;
         for i in 0..count {
-            new_start_date = self.get_next_date(new_start_date);
-            dates_to_return.push(new_start_date);
+            next_date = self.get_next_date(next_date);
+            next_dates_list.push(next_date);
         }
+        next_dates_list
+    }
 
-        dates_to_return
+    fn get_next_iter_dates(&self) -> Vec<DateTime<Utc>> {
+        lens_iter_dates(self.get_all_iter_dates(), Utc::now())
     }
 
     // standalone function that gets iterations from a single start date
@@ -258,7 +266,7 @@ impl<'a> RRule<'a> {
         // expression
         let by_day = self.by_day
             .first()
-            .unwrap_or(&panic_value)
+            .unwrap_or(&chrono_weekday_to_rrule_byday(start_date.weekday(), panic_value))
             .to_owned();
 
         if by_day.eq("PA") {
@@ -269,19 +277,19 @@ impl<'a> RRule<'a> {
             let in_future = start_date_with_intervals.gt(&start_date);
             let days_to_adjust = self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
             start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
-        }
 
-        let mut interval: u32 = self.interval.parse().unwrap();
-        let mut next_date = start_date_with_intervals;
-        for i in 0..interval {
-            next_date = next_date + Duration::days(7);
+            let mut interval: u32 = self.interval.parse().unwrap();
+            let mut next_date = start_date_with_intervals;
+            for i in 0..interval {
+                next_date = next_date + Duration::days(7);
+            }
+            let final_days_to_adjust = self.calculate_weekday_distance(by_day, next_date.weekday(), false);
+            // do a final adjustment in case we are going over monthly boundaries
+            // and the calculated date day does not coincide with the one provided
+            // by the client
+            next_date = next_date + Duration::days(final_days_to_adjust);
+            next_date
         }
-        let final_days_to_adjust = self.calculate_weekday_distance(by_day, next_date.weekday(), false);
-        // do a final adjustment in case we are going over monthly boundaries
-        // and the calculated date day does not coincide with the one provided
-        // by the client
-        next_date = next_date + Duration::days(final_days_to_adjust);
-        next_date
     }
 
     /// Calculates the weekdays to add based on the given byweekday and current weekday.
@@ -561,6 +569,48 @@ impl<'a> RRule<'a> {
     }
 }
 
+fn chrono_weekday_to_rrule_byday(weekday: Weekday, panic_value: &str) -> &str {
+    let mut weekday_string = panic_value;
+    match weekday {
+        Weekday::Mon => {
+            weekday_string = "MO";
+        }
+        Weekday::Tue => {
+            weekday_string = "TU";
+        }
+        Weekday::Wed => {
+            weekday_string = "WE";
+        }
+        Weekday::Thu => {
+            weekday_string = "TH";
+        }
+        Weekday::Fri => {
+            weekday_string = "FR";
+        }
+        Weekday::Sat => {
+            weekday_string = "SA";
+        }
+        Weekday::Sun => {
+            weekday_string = "SU";
+        }
+    }
+    weekday_string
+}
+/// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
+/// forward from, this function
+/// selects the dates that are strictly in the future and returns a modified list
+/// with past dates removed.
+fn lens_iter_dates(dates_list: Vec<DateTime<Utc>>, lens_from_date: DateTime<Utc>) -> Vec<DateTime<Utc>> {
+    let mut lensed_dates_list: Vec<DateTime<Utc>> = Vec::new();
+    for date in dates_list.iter() {
+        if date.gt(&lens_from_date) {
+            // only add dates in the future
+            lensed_dates_list.push(date.to_owned())
+        }
+    }
+    lensed_dates_list
+}
+
 /// error occurred when parsing user input
 #[derive(Debug)]
 pub struct ParseError {
@@ -570,7 +620,6 @@ pub struct ParseError {
 
 use pest::iterators::Pair;
 use std::collections::HashMap;
-use std::time::Duration;
 
 /// Converts and rrule string to a rrule struct
 fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
@@ -583,7 +632,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
         match line.as_rule() {
             Rule::tz_expr => {
                 // parse timezone
-                let tz_unparsed = line.into_inner().next().unwrap().as_str().to_string();
+                let tz_unparsed: String = line.into_inner().next().unwrap().as_str().to_string();
                 // ToDo: add a check using chrono time zone to check if the timezone is parseable
                 rrule_result.tzid = tz_unparsed;
             }
@@ -614,6 +663,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             }
 
             Rule::dtstart_expr_without_tz => {
+                println!("checking dtstart, current is {:?}", rrule_result.dtstart);
                 // assume UTC if not provided
                 if rrule_result.dtstart.is_empty() {
                     let mut non_validated_dtstart: String =
@@ -622,23 +672,16 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
                         let naive_date =
                             NaiveDateTime::parse_from_str(&non_validated_dtstart, "%Y%m%dT%H%M%SZ")
                                 .unwrap();
-                        rrule_result.dtstart = chrono_tz::UTC
-                            .from_local_datetime(&naive_date)
-                            .unwrap()
-                            .to_string();
+                        println!("setting dtstart");
+                        rrule_result.dtstart = naive_date.to_string();
                     } else {
-                        if rrule_result.tzid.is_empty() {
                             // no tzId specified, use UTC
                             let naive_date = NaiveDateTime::parse_from_str(
                                 &non_validated_dtstart,
                                 "%Y%m%dT%H%M%S",
                             )
                             .unwrap();
-                            rrule_result.dtstart = chrono_tz::UTC
-                                .from_local_datetime(&naive_date)
-                                .unwrap()
-                                .to_string();
-                        }
+                            rrule_result.dtstart = naive_date.to_string();
                     }
                 }
             }
@@ -731,19 +774,20 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=WEEKLY;INTERVAL=2;COUNT=12;BYDAY=FR".to_owned();
+    let s = "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYMINUTE=0;TZID=Australia/West;DTSTART=20190101T030000".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
     println!("Rrule is {:?}", rrule_result.to_json());
-    println!("Next dates are {:?}", rrule_result.get_next_iter_dates())
+    println!("All iter dates are {:?}", rrule_result.get_all_iter_dates());
+    println!("Next dates are {:?}", rrule_result.get_next_iter_dates());
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
     use chrono::offset::TimeZone;
-    use chrono::{Duration,Datelike, Utc};
+    use chrono::{Duration, Datelike, Utc, Weekday};
     use serde_json::json;
 
     struct RRuleTestCase<'a> {
@@ -796,15 +840,23 @@ mod tests {
             },
             RRuleTestCase{
                 rrule_string: "DTSTART=19970714T133000;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 UTC","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
             },
             RRuleTestCase{
                 rrule_string: "DTSTART=19970714T133000Z;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 UTC","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
             },
             RRuleTestCase{
                 rrule_string: "DTSTART=19970714T133000Z;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth",
-                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00 UTC","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+            },
+            RRuleTestCase{
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000Z",
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+            },
+            RRuleTestCase{
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000",
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
             }
         ];
 
@@ -830,9 +882,17 @@ mod tests {
     }
 
     #[test]
-    fn test_fortnightly_rrules() {
+    fn test_fortnightly_rrules_fall_on_the_day_specified() {
         let mut rrule_result = RRule::new();
-
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYMINUTE=0;TZID=Australia/West;DTSTART=20190101T030000",
+        );
+        let mut iter_dates = rrule_result.get_all_iter_dates();
+        for date in iter_dates.iter() {
+            println!("Checking for date {:?}", date);
+            assert_eq!(Weekday::Tue, date.weekday())
+        }
     }
 
     #[test]
@@ -888,10 +948,10 @@ mod tests {
         assert_eq!(rrule_actual_1, rrule_expected_1)
     }
 
-    #[test]
-    fn test_wtih_day() {
-        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
-        let next_date = test_start_date + Duration::days(38);
-        assert_eq!(next_date, test_start_date);
-    }
+//    #[test]
+//    fn test_wtih_day() {
+//        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
+//        let next_date = test_start_date + Duration::days(38);
+//        assert_eq!(next_date, test_start_date);
+//    }
 }
