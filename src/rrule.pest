@@ -14,6 +14,7 @@ recur_expr = _{ dtstart_expr_with_tz |
                 byminute_expr |
                 bysecond_expr |
                 byday_expr |
+                bymonth_expr |
                 bymonthday_expr |
                 byyearday_expr |
                 wkst_expr |
@@ -72,6 +73,9 @@ weekday = { monday | tuesday | wednesday | thursday | friday | saturday | sunday
     sunday = { "SU" }
 byday_field = @{ weekday ~ ("," ~ weekday)? }
 byday_expr = { "BYDAY=" ~ byday_field }
+
+monthnum_field = @{ ASCII_DIGIT* ~ ("," ~ ASCII_DIGIT*)? }
+bymonth_expr = { "BYMONTH=" ~ monthnum_field }
 
 BYMONTHDAY_DIGIT = { '1'..'9' |                        // 1-9
                     ('1'..'2' ~ '1'..'9') |            // 10-29

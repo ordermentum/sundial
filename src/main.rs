@@ -41,6 +41,10 @@ struct RRule<'a> {
     #[serde(default = "default_rrule_vec_field")]
     #[serde(borrow)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    by_month: Vec<&'a str>,
+    #[serde(default = "default_rrule_vec_field")]
+    #[serde(borrow)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     by_hour: Vec<&'a str>,
     #[serde(default = "default_rrule_vec_field")]
     #[serde(borrow)]
@@ -88,6 +92,7 @@ impl<'a> RRule<'a> {
             count: String::from(""),
             interval: String::from(""),
             wkst: String::from(""),
+            by_month: Vec::new(),
             by_hour: Vec::new(),
             by_minute: Vec::new(),
             by_second: Vec::new(),
@@ -152,8 +157,10 @@ impl<'a> RRule<'a> {
             return_date = self.handle_monthly(start_date)
         } else if self.frequency == "WEEKLY" {
             return_date = self.handle_weekly(start_date)
+        } else if self.frequency == "DAILY" {
+            return_date = self.handle_daily(start_date)
         } else {
-            println!("given RRule format has not been implemented yet")
+            println!("Given RRule format has not been implemented yet")
         }
         return_date
     }
@@ -268,10 +275,7 @@ impl<'a> RRule<'a> {
         let by_day = self
             .by_day
             .first()
-            .unwrap_or(&chrono_weekday_to_rrule_byday(
-                start_date.weekday(),
-                panic_value,
-            ))
+            .unwrap_or(&chrono_weekday_to_rrule_byday(start_date.weekday()))
             .to_owned();
 
         if by_day.eq("PA") {
@@ -297,6 +301,53 @@ impl<'a> RRule<'a> {
             next_date = next_date + Duration::days(final_days_to_adjust);
             next_date
         }
+    }
+
+    fn handle_daily(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
+
+        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
+        let by_month = self.by_month.first().unwrap_or(&"").to_owned();
+
+        let mut interval: u32 = self.interval.parse().unwrap();
+        let mut next_date = start_date_with_intervals;
+
+        if by_month.is_empty() {
+            if by_day.is_empty() {
+                println!("inside empty byday block");
+                for i in 0..interval {
+                    next_date = next_date + Duration::days(1);
+                }
+            } else {
+                loop {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::days(1);
+                    }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            if by_day.is_empty() {
+                println!("inside empty byday block");
+                for i in 0..interval {
+                    next_date = next_date + Duration::days(1);
+                }
+            } else {
+                loop {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::days(1);
+                    }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        next_date
     }
 
     /// Calculates the weekdays to add based on the given byweekday and current weekday.
@@ -581,8 +632,8 @@ impl<'a> RRule<'a> {
     }
 }
 
-fn chrono_weekday_to_rrule_byday(weekday: Weekday, panic_value: &str) -> &str {
-    let mut weekday_string = panic_value;
+fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
+    let mut weekday_string = "";
     match weekday {
         Weekday::Mon => {
             weekday_string = "MO";
@@ -713,6 +764,16 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
                 rrule_result.count = line.into_inner().next().unwrap().as_str().to_string();
             }
 
+            Rule::bymonth_expr => {
+                rrule_result.by_month = line
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .split(",")
+                    .collect();
+            }
+
             Rule::byhour_expr => {
                 rrule_result.by_hour = line
                     .into_inner()
@@ -785,8 +846,7 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s =
-        "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;TZID=Australia/West;DTSTART=20190101T030000".to_owned();
+    let s = "FREQ=DAILY;INTERVAL=2;BYDAY=WE;BYMONTH=12;DTSTART=20190327T030000".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
@@ -799,8 +859,10 @@ fn main() {
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
     use chrono::offset::TimeZone;
-    use chrono::{Datelike, Duration, Timelike, Utc, Weekday};
+    use chrono::{DateTime, Datelike, Duration, Timelike, Utc, Weekday};
     use serde_json::json;
+    use std::iter::FromIterator;
+    use std::iter::Iterator;
 
     struct RRuleTestCase<'a> {
         rrule_string: &'a str,
@@ -879,6 +941,67 @@ mod tests {
 
             assert_eq!(i.expected_flat_json, rrule_result.to_json())
         }
+    }
+
+    #[test]
+    fn test_daily_rules_work_as_expected() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-04-03 09:01:00".to_owned(),
+                "2019-04-10 09:01:00".to_owned(),
+                "2019-04-17 09:01:00".to_owned(),
+                "2019-04-24 09:01:00".to_owned()
+            ],
+            rrule_result
+                .get_all_iter_dates()
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
+
+        rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-11-01 10:01:58".to_owned(),
+                "2019-11-22 10:01:58".to_owned(),
+                "2020-11-13 10:01:58".to_owned(),
+                "2021-11-05 10:01:58".to_owned(),
+                "2021-11-26 10:01:58".to_owned(),
+                "2022-11-18 10:01:58".to_owned(),
+                "2023-11-10 10:01:58".to_owned(),
+                "2024-11-01 10:01:58".to_owned(),
+                "2024-11-22 10:01:58".to_owned(),
+                "2025-11-14 10:01:58".to_owned(),
+                "2026-11-06 10:01:58".to_owned(),
+                "2026-11-27 10:01:58".to_owned(),
+                "2027-11-19 10:01:58".to_owned(),
+                "2028-11-10 10:01:58".to_owned(),
+                "2029-11-02 10:01:58".to_owned(),
+                "2029-11-23 10:01:58".to_owned(),
+                "2030-11-15 10:01:58".to_owned(),
+                "2031-11-07 10:01:58".to_owned(),
+                "2031-11-28 10:01:58".to_owned(),
+                "2032-11-19 10:01:58".to_owned(),
+            ],
+            rrule_result
+                .get_all_iter_dates()
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
     }
 
     #[test]
@@ -991,11 +1114,4 @@ mod tests {
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
         assert_eq!(rrule_actual_1, rrule_expected_1)
     }
-
-    //    #[test]
-    //    fn test_wtih_day() {
-    //        let mut test_start_date = Utc.ymd(2019, 02, 26).and_hms(01, 12, 13);
-    //        let next_date = test_start_date + Duration::days(38);
-    //        assert_eq!(next_date, test_start_date);
-    //    }
 }
