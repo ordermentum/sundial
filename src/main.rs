@@ -3,13 +3,9 @@ extern crate pest_derive;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
-use chrono_tz::Tz;
-use chrono_tz::UTC;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::json;
-use serde_json::Result;
 use std::env;
 use std::str::FromStr;
 
@@ -159,8 +155,14 @@ impl<'a> RRule<'a> {
             return_date = self.handle_weekly(start_date)
         } else if self.frequency == "DAILY" {
             return_date = self.handle_daily(start_date)
+        } else if self.frequency == "HOURLY" {
+            return_date = self.handle_hourly(start_date);
+        } else if self.frequency == "MINUTELY" {
+            return_date = self.handle_minutely(start_date);
+        } else if self.frequency == "SECONDLY" {
+            return_date = self.handle_secondly(start_date);
         } else {
-            println!("Given RRule format has not been implemented yet")
+            println!("Given rrule frequency is not supported");
         }
         return_date
     }
@@ -177,7 +179,7 @@ impl<'a> RRule<'a> {
             start_date_with_intervals = start_date_with_intervals.with_second(second).unwrap();
         }
 
-        if self.frequency.ne("SECONDLY") && self.frequency.ne("MONTHLY") {
+        if self.frequency.ne("SECONDLY") && self.frequency.ne("MINUTELY") {
             let mut minute: u32 = start_date.minute();
             if !self.by_minute.is_empty() {
                 minute = self.by_minute.first().unwrap().parse().unwrap();
@@ -186,7 +188,7 @@ impl<'a> RRule<'a> {
         }
 
         if self.frequency.ne("SECONDLY")
-            && self.frequency.ne("MONTHLY")
+            && self.frequency.ne("MINUTELY")
             && self.frequency.ne("HOURLY")
         {
             let mut hour: u32 = start_date.hour();
@@ -338,6 +340,220 @@ impl<'a> RRule<'a> {
                 loop {
                     for i in 0..interval {
                         next_date = next_date + Duration::days(1);
+                    }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        next_date
+    }
+
+    fn handle_hourly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut next_date = self.with_initial_time_intervals(start_date);
+        let mut interval: u32 = self.interval.parse().unwrap();
+
+        let by_hour = self.by_hour.first().unwrap_or(&"").to_owned();
+        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
+        let by_month = self.by_month.first().unwrap_or(&"").to_owned();
+
+        if by_hour.is_empty() {
+            if by_month.is_empty() {
+                if by_day.is_empty() {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::hours(1)
+                    }
+                } else {
+                    loop {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::hours(1)
+                        }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if by_day.is_empty() {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::hours(1)
+                    }
+                } else {
+                    loop {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::hours(1)
+                        }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        } else {
+            loop {
+                if by_month.is_empty() {
+                    if by_day.is_empty() {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::hours(1)
+                        }
+                    } else {
+                        loop {
+                            for i in 0..interval {
+                                next_date = next_date + Duration::hours(1)
+                            }
+                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    if by_day.is_empty() {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::hours(1)
+                        }
+                    } else {
+                        loop {
+                            for i in 0..interval {
+                                next_date = next_date + Duration::hours(1)
+                            }
+                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                                && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                if next_date.hour().eq(&by_hour.parse::<u32>().unwrap()) {
+                    break;
+                }
+            }
+        }
+        next_date
+    }
+
+    fn handle_minutely(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut next_date = self.with_initial_time_intervals(start_date);
+        let mut interval: u32 = self.interval.parse().unwrap();
+
+        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
+        let by_month = self.by_month.first().unwrap_or(&"").to_owned();
+        let by_hour = self.by_hour.first().unwrap_or(&"").to_owned();
+        let by_minute = self.by_minute.first().unwrap_or(&"").to_owned();
+
+        if by_hour.is_empty() {
+            if by_month.is_empty() {
+                if by_day.is_empty() {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::minutes(1)
+                    }
+                } else {
+                    loop {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::minutes(1)
+                        }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if by_day.is_empty() {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::minutes(1)
+                    }
+                } else {
+                    loop {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::minutes(1)
+                        }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        } else {
+            loop {
+                if by_month.is_empty() {
+                    if by_day.is_empty() {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::minutes(1)
+                        }
+                    } else {
+                        loop {
+                            for i in 0..interval {
+                                next_date = next_date + Duration::minutes(1)
+                            }
+                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    if by_day.is_empty() {
+                        for i in 0..interval {
+                            next_date = next_date + Duration::minutes(1)
+                        }
+                    } else {
+                        loop {
+                            for i in 0..interval {
+                                next_date = next_date + Duration::minutes(1)
+                            }
+                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                                && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                if next_date.hour().eq(&by_hour.parse::<u32>().unwrap()) {
+                    break;
+                }
+            }
+        }
+        next_date
+    }
+
+    fn handle_secondly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+        let mut next_date = self.with_initial_time_intervals(start_date);
+        let mut interval: u32 = self.interval.parse().unwrap();
+
+        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
+        let by_month = self.by_month.first().unwrap_or(&"").to_owned();
+
+        if by_month.is_empty() {
+            if by_day.is_empty() {
+                for i in 0..interval {
+                    next_date = next_date + Duration::seconds(1)
+                }
+            } else {
+                loop {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::seconds(1)
+                    }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            if by_day.is_empty() {
+                for i in 0..interval {
+                    next_date = next_date + Duration::seconds(1)
+                }
+            } else {
+                loop {
+                    for i in 0..interval {
+                        next_date = next_date + Duration::seconds(1)
                     }
                     if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
                         && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
@@ -659,6 +875,7 @@ fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
     }
     weekday_string
 }
+
 /// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
 /// forward from, this function
 /// selects the dates that are strictly in the future and returns a modified list
@@ -685,7 +902,6 @@ pub struct ParseError {
 }
 
 use pest::iterators::Pair;
-use std::collections::HashMap;
 
 /// Converts and rrule string to a rrule struct
 fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
@@ -731,7 +947,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             Rule::dtstart_expr_without_tz => {
                 // assume UTC if not provided
                 if rrule_result.dtstart.is_empty() {
-                    let mut non_validated_dtstart: String =
+                    let non_validated_dtstart: String =
                         line.into_inner().next().unwrap().as_str().to_string();
                     if non_validated_dtstart.contains("Z") {
                         let naive_date =
@@ -846,7 +1062,7 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=DAILY;INTERVAL=2;BYDAY=WE;BYMONTH=12;DTSTART=20190327T030000".to_owned();
+    let s = "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
@@ -904,33 +1120,33 @@ mod tests {
                 rrule_string: "INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;FREQ=FORTNIGHTLY",
                 expected_flat_json: r#"{"frequency":"FORTNIGHTLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "DTSTART;TZID=Australia/Sydney:19970714T133000;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 AEST","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 AEST","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "DTSTART;TZID=Europe/London:19970714T133000;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 BST","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00 BST","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "DTSTART=19970714T133000;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "DTSTART=19970714T133000Z;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU",
-                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "DTSTART=19970714T133000Z;FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth",
-                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000Z",
-                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             },
-            RRuleTestCase{
+            RRuleTestCase {
                 rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000",
-                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             }
         ];
 
@@ -995,6 +1211,123 @@ mod tests {
                 "2031-11-07 10:01:58".to_owned(),
                 "2031-11-28 10:01:58".to_owned(),
                 "2032-11-19 10:01:58".to_owned(),
+            ],
+            rrule_result
+                .get_all_iter_dates()
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
+    }
+
+    #[test]
+    fn test_hourly_rules_work_as_expected() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-03-27 06:00:00".to_owned(),
+                "2019-03-27 09:00:00".to_owned(),
+                "2019-03-27 12:00:00".to_owned(),
+                "2019-03-27 15:00:00".to_owned(),
+                "2019-03-27 18:00:00".to_owned(),
+                "2019-03-27 21:00:00".to_owned(),
+                "2019-03-28 00:00:00".to_owned(),
+                "2019-03-28 03:00:00".to_owned(),
+                "2019-03-28 06:00:00".to_owned(),
+                "2019-03-28 09:00:00".to_owned(),
+                "2019-03-28 12:00:00".to_owned(),
+                "2019-03-28 15:00:00".to_owned(),
+                "2019-03-28 18:00:00".to_owned(),
+                "2019-03-28 21:00:00".to_owned(),
+                "2019-03-29 00:00:00".to_owned(),
+                "2019-03-29 03:00:00".to_owned(),
+                "2019-03-29 06:00:00".to_owned(),
+                "2019-03-29 09:00:00".to_owned(),
+                "2019-03-29 12:00:00".to_owned(),
+                "2019-03-29 15:00:00".to_owned(),
+            ],
+            rrule_result
+                .get_all_iter_dates()
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
+
+        rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-04-02 09:12:00".to_owned(),
+                "2019-04-09 09:12:00".to_owned(),
+                "2019-04-16 09:12:00".to_owned(),
+                "2019-04-23 09:12:00".to_owned(),
+                "2019-04-30 09:12:00".to_owned(),
+                "2019-05-07 09:12:00".to_owned(),
+                "2019-05-14 09:12:00".to_owned(),
+                "2019-05-21 09:12:00".to_owned(),
+                "2019-05-28 09:12:00".to_owned(),
+                "2019-06-04 09:12:00".to_owned(),
+                "2019-06-11 09:12:00".to_owned(),
+                "2019-06-18 09:12:00".to_owned(),
+                "2019-06-25 09:12:00".to_owned(),
+                "2019-07-02 09:12:00".to_owned(),
+                "2019-07-09 09:12:00".to_owned(),
+                "2019-07-16 09:12:00".to_owned(),
+                "2019-07-23 09:12:00".to_owned(),
+                "2019-07-30 09:12:00".to_owned(),
+                "2019-08-06 09:12:00".to_owned(),
+                "2019-08-13 09:12:00".to_owned(),
+            ],
+            rrule_result
+                .get_all_iter_dates()
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
+    }
+
+    #[test]
+    fn test_monthly_rules_work_as_expected() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-03-27 03:03:00".to_owned(),
+                "2019-03-27 03:06:00".to_owned(),
+                "2019-03-27 03:09:00".to_owned(),
+                "2019-03-27 03:12:00".to_owned(),
+                "2019-03-27 03:15:00".to_owned(),
+                "2019-03-27 03:18:00".to_owned(),
+                "2019-03-27 03:21:00".to_owned(),
+                "2019-03-27 03:24:00".to_owned(),
+                "2019-03-27 03:27:00".to_owned(),
+                "2019-03-27 03:30:00".to_owned(),
+                "2019-03-27 03:33:00".to_owned(),
+                "2019-03-27 03:36:00".to_owned(),
+                "2019-03-27 03:39:00".to_owned(),
+                "2019-03-27 03:42:00".to_owned(),
+                "2019-03-27 03:45:00".to_owned(),
+                "2019-03-27 03:48:00".to_owned(),
+                "2019-03-27 03:51:00".to_owned(),
+                "2019-03-27 03:54:00".to_owned(),
+                "2019-03-27 03:57:00".to_owned(),
+                "2019-03-27 04:00:00".to_owned()
             ],
             rrule_result
                 .get_all_iter_dates()
