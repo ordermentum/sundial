@@ -3,7 +3,9 @@ extern crate pest_derive;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
+use chrono_tz::Tz;
 use pest::Parser;
+use serde::de::value::StrDeserializer;
 use serde::Deserialize;
 use serde::Serialize;
 use std::env;
@@ -108,13 +110,21 @@ impl<'a> RRule<'a> {
 
     // show me the money
     // parent function that can get a list of all future iterations based on count
-    fn get_all_iter_dates(&self) -> Vec<DateTime<Utc>> {
-        // ToDo: Need to respect timezones and not assume UTC
+    fn get_all_iter_dates(&self) -> Vec<DateTime<Tz>> {
+        let timezone: Tz = if self.tzid.is_empty() {
+            "UTC".parse().unwrap()
+        } else {
+            self.tzid.parse().unwrap()
+        };
+
+        // we will work under the assumption that the date provided by dtstart parser will always be
+        // and we will convert to the required timezone if provided.
         let mut start_date = if self.dtstart.is_empty() {
-            Utc::now()
+            Utc::now().with_timezone(&timezone)
         } else {
             Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S")
-                .unwrap() as DateTime<Utc>
+                .unwrap()
+                .with_timezone(&timezone)
         };
 
         let mut count: i8 = 52; // default count of iterations to build
@@ -130,23 +140,35 @@ impl<'a> RRule<'a> {
             count = self.count.parse().unwrap()
         }
 
-        let mut next_dates_list: Vec<DateTime<Utc>> = Vec::new();
+        let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
-        for i in 0..count {
+        for _i in 0..count {
             next_date = self.get_next_date(next_date);
             next_dates_list.push(next_date);
         }
         next_dates_list
     }
 
-    fn get_next_iter_dates(&self) -> Vec<DateTime<Utc>> {
-        lens_iter_dates(self.get_all_iter_dates(), Utc::now())
+    fn get_all_iter_dates_iso8601(&self) -> Vec<String> {
+        convert_datetime_tz_list_to_rfc339(self.get_all_iter_dates())
+    }
+
+    fn get_next_iter_dates(&self) -> Vec<DateTime<Tz>> {
+        let timezone: Tz = if self.tzid.is_empty() {
+            "UTC".parse().unwrap()
+        } else {
+            self.tzid.parse().unwrap()
+        };
+        lens_iter_dates(
+            self.get_all_iter_dates(),
+            Utc::now().with_timezone(&timezone),
+        )
     }
 
     // standalone function that gets iterations from a single start date
-    fn get_next_date(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn get_next_date(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut return_date = start_date;
-        // handle yearly
+
         if self.frequency.eq("YEARLY") {
             return_date = self.handle_yearly(start_date)
         } else if self.frequency == "MONTHLY" {
@@ -168,7 +190,7 @@ impl<'a> RRule<'a> {
     }
 
     // set the lower interval time for start date
-    fn with_initial_time_intervals(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn with_initial_time_intervals(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut start_date_with_intervals = start_date;
 
         if self.frequency.ne("SECONDLY") {
@@ -201,9 +223,24 @@ impl<'a> RRule<'a> {
         start_date_with_intervals
     }
 
-    // handles the calculation of next date based on a monthly rule
-    fn handle_monthly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
+    fn handle_yearly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+        let interval: u32 = self.interval.parse().unwrap_or(1);
+        let max_year = 2099;
         let mut next_date = start_date;
+        let mut next_year = start_date.year() + 1;
+        for _i in 0..interval {
+            if next_date.year().lt(&(max_year as i32)) {
+                next_date = next_date.with_year(next_year).unwrap()
+            }
+            next_year = next_year + 1;
+        }
+        next_date
+    }
+
+    // handles the calculation of next date based on a monthly rule
+    fn handle_monthly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+        let mut next_date: DateTime<Tz> = start_date;
         let panic_value: u32 = 50;
         // use 50 as panic day as it resides outside the bound of permissible parse range for byMonthDay
         // expression
@@ -218,11 +255,11 @@ impl<'a> RRule<'a> {
                 next_date = next_date.with_day(month_day).unwrap()
             } else if start_date_day > month_day {
                 if start_date.month().lt(&(12 as u32)) {
-                    let mut month_added = next_date.with_month(start_date.month() + 1).unwrap();
+                    let month_added = next_date.with_month(start_date.month() + 1).unwrap();
                     next_date = month_added.with_day(month_day).unwrap();
                 } else {
-                    let mut year_added = next_date.with_year(start_date.year() + 1).unwrap();
-                    let mut month_added = year_added.with_month(1).unwrap();
+                    let year_added = next_date.with_year(start_date.year() + 1).unwrap();
+                    let month_added = year_added.with_month(1).unwrap();
                     next_date = month_added.with_day(month_day).unwrap();
                 }
             } else if start_date_day == month_day {
@@ -232,11 +269,11 @@ impl<'a> RRule<'a> {
                 // for next month
                 if start_date_with_intervals.ge(&start_date) {
                     if start_date.month().lt(&(12 as u32)) {
-                        let mut month_added = next_date.with_month(start_date.month() + 1).unwrap();
+                        let month_added = next_date.with_month(start_date.month() + 1).unwrap();
                         next_date = month_added.with_day(month_day).unwrap();
                     } else {
-                        let mut year_added = next_date.with_year(start_date.year() + 1).unwrap();
-                        let mut month_added = year_added.with_month(1).unwrap();
+                        let year_added = next_date.with_year(start_date.year() + 1).unwrap();
+                        let month_added = year_added.with_month(1).unwrap();
                         next_date = month_added.with_day(month_day).unwrap();
                     }
                 }
@@ -245,30 +282,9 @@ impl<'a> RRule<'a> {
         next_date
     }
 
-    // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
-    fn handle_yearly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
-        let mut interval: u32 = self.interval.parse().unwrap();
-        let max_year = 2099;
-        let mut next_date = start_date;
-        let mut next_year = start_date.year() + 1;
-        for i in 0..interval {
-            if next_date.year().lt(&(max_year as i32)) {
-                next_date = next_date.with_year(next_year).unwrap()
-            }
-            next_year = next_year + 1;
-        }
-        next_date
-    }
-
     /// Handles both weekly and special variants of weekly such as [FREQ=WEEKLY;INTERVAL=2;]
     /// which can colloquially evaluate to fortnightly.
-    /// Pseudo Code (Todo: Delete Later)
-    /// -- for only one byWeekDay
-    /// adjust start_date day to match the byweekday
-    /// for i in 0..interval
-    ///     add 7 days to the current_date
-    ///     if not(check if it falls on the right byWkDay) -> adjust to the right wkday
-    fn handle_weekly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn handle_weekly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
         // adjust start_date if it does not start on the start
         let panic_value = "PA";
@@ -290,9 +306,9 @@ impl<'a> RRule<'a> {
                 self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
             start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
 
-            let mut interval: u32 = self.interval.parse().unwrap();
+            let mut interval: u32 = self.interval.parse().unwrap_or(1);
             let mut next_date = start_date_with_intervals;
-            for i in 0..interval {
+            for _i in 0..interval {
                 next_date = next_date + Duration::days(7);
             }
             let final_days_to_adjust =
@@ -305,24 +321,24 @@ impl<'a> RRule<'a> {
         }
     }
 
-    fn handle_daily(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn handle_daily(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
 
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
 
-        let mut interval: u32 = self.interval.parse().unwrap();
+        let interval: u32 = self.interval.parse().unwrap_or(1);
         let mut next_date = start_date_with_intervals;
 
         if by_month.is_empty() {
             if by_day.is_empty() {
                 println!("inside empty byday block");
-                for i in 0..interval {
+                for _i in 0..interval {
                     next_date = next_date + Duration::days(1);
                 }
             } else {
                 loop {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::days(1);
                     }
                     if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -333,12 +349,12 @@ impl<'a> RRule<'a> {
         } else {
             if by_day.is_empty() {
                 println!("inside empty byday block");
-                for i in 0..interval {
+                for _i in 0..interval {
                     next_date = next_date + Duration::days(1);
                 }
             } else {
                 loop {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::days(1);
                     }
                     if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -352,9 +368,9 @@ impl<'a> RRule<'a> {
         next_date
     }
 
-    fn handle_hourly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn handle_hourly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut next_date = self.with_initial_time_intervals(start_date);
-        let mut interval: u32 = self.interval.parse().unwrap();
+        let interval: u32 = self.interval.parse().unwrap_or(1);
 
         let by_hour = self.by_hour.first().unwrap_or(&"").to_owned();
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
@@ -378,12 +394,12 @@ impl<'a> RRule<'a> {
                 }
             } else {
                 if by_day.is_empty() {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::hours(1)
                     }
                 } else {
                     loop {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::hours(1)
                         }
                         if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -413,12 +429,12 @@ impl<'a> RRule<'a> {
                     }
                 } else {
                     if by_day.is_empty() {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::hours(1)
                         }
                     } else {
                         loop {
-                            for i in 0..interval {
+                            for _i in 0..interval {
                                 next_date = next_date + Duration::hours(1)
                             }
                             if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -437,9 +453,9 @@ impl<'a> RRule<'a> {
         next_date
     }
 
-    fn handle_minutely(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn handle_minutely(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut next_date = self.with_initial_time_intervals(start_date);
-        let mut interval: u32 = self.interval.parse().unwrap();
+        let interval: u32 = self.interval.parse().unwrap_or(1);
 
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
@@ -449,12 +465,12 @@ impl<'a> RRule<'a> {
         if by_hour.is_empty() {
             if by_month.is_empty() {
                 if by_day.is_empty() {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::minutes(1)
                     }
                 } else {
                     loop {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::minutes(1)
                         }
                         if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -464,12 +480,12 @@ impl<'a> RRule<'a> {
                 }
             } else {
                 if by_day.is_empty() {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::minutes(1)
                     }
                 } else {
                     loop {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::minutes(1)
                         }
                         if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -484,12 +500,12 @@ impl<'a> RRule<'a> {
             loop {
                 if by_month.is_empty() {
                     if by_day.is_empty() {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::minutes(1)
                         }
                     } else {
                         loop {
-                            for i in 0..interval {
+                            for _i in 0..interval {
                                 next_date = next_date + Duration::minutes(1)
                             }
                             if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -499,12 +515,12 @@ impl<'a> RRule<'a> {
                     }
                 } else {
                     if by_day.is_empty() {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::minutes(1)
                         }
                     } else {
                         loop {
-                            for i in 0..interval {
+                            for _i in 0..interval {
                                 next_date = next_date + Duration::minutes(1)
                             }
                             if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -523,21 +539,21 @@ impl<'a> RRule<'a> {
         next_date
     }
 
-    fn handle_secondly(&self, start_date: DateTime<Utc>) -> DateTime<Utc> {
+    fn handle_secondly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut next_date = self.with_initial_time_intervals(start_date);
-        let mut interval: u32 = self.interval.parse().unwrap();
+        let interval: u32 = self.interval.parse().unwrap_or(1);
 
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
 
         if by_month.is_empty() {
             if by_day.is_empty() {
-                for i in 0..interval {
+                for _i in 0..interval {
                     next_date = next_date + Duration::seconds(1)
                 }
             } else {
                 loop {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::seconds(1)
                     }
                     if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -552,7 +568,7 @@ impl<'a> RRule<'a> {
                 }
             } else {
                 loop {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::seconds(1)
                     }
                     if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
@@ -849,31 +865,15 @@ impl<'a> RRule<'a> {
 }
 
 fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
-    let mut weekday_string = "";
-    match weekday {
-        Weekday::Mon => {
-            weekday_string = "MO";
-        }
-        Weekday::Tue => {
-            weekday_string = "TU";
-        }
-        Weekday::Wed => {
-            weekday_string = "WE";
-        }
-        Weekday::Thu => {
-            weekday_string = "TH";
-        }
-        Weekday::Fri => {
-            weekday_string = "FR";
-        }
-        Weekday::Sat => {
-            weekday_string = "SA";
-        }
-        Weekday::Sun => {
-            weekday_string = "SU";
-        }
-    }
-    weekday_string
+    return match weekday {
+        Weekday::Mon => "MO",
+        Weekday::Tue => "TU",
+        Weekday::Wed => "WE",
+        Weekday::Thu => "TH",
+        Weekday::Fri => "FR",
+        Weekday::Sat => "SA",
+        Weekday::Sun => "SU",
+    };
 }
 
 /// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
@@ -881,10 +881,10 @@ fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
 /// selects the dates that are strictly in the future and returns a modified list
 /// with past dates removed.
 fn lens_iter_dates(
-    dates_list: Vec<DateTime<Utc>>,
-    lens_from_date: DateTime<Utc>,
-) -> Vec<DateTime<Utc>> {
-    let mut lensed_dates_list: Vec<DateTime<Utc>> = Vec::new();
+    dates_list: Vec<DateTime<Tz>>,
+    lens_from_date: DateTime<Tz>,
+) -> Vec<DateTime<Tz>> {
+    let mut lensed_dates_list: Vec<DateTime<Tz>> = Vec::new();
     for date in dates_list.iter() {
         if date.gt(&lens_from_date) {
             // only add dates in the future
@@ -894,14 +894,20 @@ fn lens_iter_dates(
     lensed_dates_list
 }
 
+fn convert_datetime_tz_list_to_rfc339(dates_list: Vec<DateTime<Tz>>) -> Vec<String> {
+    let mut converted_dates: Vec<String> = Vec::new();
+    for date in dates_list.iter() {
+        converted_dates.push(date.to_rfc3339());
+    }
+    converted_dates
+}
+
 /// error occurred when parsing user input
 #[derive(Debug)]
 pub struct ParseError {
     pub location: pest::error::InputLocation,
     pub expected: String,
 }
-
-use pest::iterators::Pair;
 
 /// Converts and rrule string to a rrule struct
 fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
@@ -1062,22 +1068,26 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000".to_owned();
+    let s =
+        "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000;TZID=Australia/Sydney".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
     println!("Rrule is {:?}", rrule_result.to_json());
     println!("All iter dates are {:?}", rrule_result.get_all_iter_dates());
     println!("Next dates are {:?}", rrule_result.get_next_iter_dates());
+    println!(
+        "ISO8601 dates are {:?}",
+        rrule_result.get_all_iter_dates_iso8601()
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, RRule};
-    use chrono::offset::TimeZone;
-    use chrono::{DateTime, Datelike, Duration, Timelike, Utc, Weekday};
-    use serde_json::json;
-    use std::iter::FromIterator;
+    use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc, Weekday};
+    use chrono_tz::Etc::UTC;
+    use chrono_tz::Tz;
     use std::iter::Iterator;
 
     struct RRuleTestCase<'a> {
@@ -1160,7 +1170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_daily_rules_work_as_expected() {
+    fn test_daily_rules_work_1() {
         let mut rrule_result = RRule::new();
 
         convert_to_rrule(
@@ -1181,8 +1191,11 @@ mod tests {
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
         );
+    }
 
-        rrule_result = RRule::new();
+    #[test]
+    fn test_daily_rules_work_2() {
+        let mut rrule_result = RRule::new();
 
         convert_to_rrule(
             &mut rrule_result,
@@ -1221,7 +1234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hourly_rules_work_as_expected() {
+    fn test_hourly_rules_work_1() {
         let mut rrule_result = RRule::new();
 
         convert_to_rrule(
@@ -1258,8 +1271,11 @@ mod tests {
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
         );
+    }
 
-        rrule_result = RRule::new();
+    #[test]
+    fn test_hourly_rules_work_2() {
+        let mut rrule_result = RRule::new();
 
         convert_to_rrule(
             &mut rrule_result,
@@ -1350,7 +1366,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fortnightly_rrules_fall_on_the_day_specified() {
+    fn test_fortnightly_rrules_1() {
         let mut rrule_result = RRule::new();
 
         // test case group 1 - implicit by day from dtStart
@@ -1366,11 +1382,14 @@ mod tests {
             assert_eq!(15, date.minute());
             assert_eq!(48, date.second());
         }
+    }
 
-        rrule_result = RRule::new();
+    #[test]
+    fn test_fortnightly_rules_2() {
+        let mut rrule_result = RRule::new();
 
         convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
-        iter_dates = rrule_result.get_all_iter_dates();
+        let iter_dates = rrule_result.get_all_iter_dates();
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Thu, date.weekday());
@@ -1378,20 +1397,20 @@ mod tests {
             assert_eq!(00, date.minute());
             assert_eq!(03, date.second());
         }
+    }
 
-        rrule_result = RRule::new();
-        // test case 2 - explicit by day
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;TZID=Australia/West;DTSTART=20190101T030000",
-        );
-        let mut iter_dates = rrule_result.get_all_iter_dates();
+    #[test]
+    fn test_fortnightly_rules_3() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
+        let iter_dates = rrule_result.get_all_iter_dates();
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
-            assert_eq!(Weekday::Fri, date.weekday());
-            assert_eq!(03, date.hour());
+            assert_eq!(Weekday::Thu, date.weekday());
+            assert_eq!(17, date.hour());
             assert_eq!(00, date.minute());
-            assert_eq!(00, date.second());
+            assert_eq!(03, date.second());
         }
     }
 
@@ -1403,10 +1422,15 @@ mod tests {
             &mut rrule_result,
             "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         );
-        let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
+        let mut test_start_date: DateTime<Tz> = Utc
+            .ymd(2019, 03, 15)
+            .and_hms(01, 12, 13)
+            .with_timezone(&UTC);
         assert_eq!(
             test_start_date.with_day(28).unwrap(),
-            rrule_result.get_next_date(test_start_date)
+            rrule_result
+                .get_next_date(test_start_date)
+                .with_timezone(&UTC)
         )
     }
 
@@ -1416,10 +1440,15 @@ mod tests {
 
         // test we get the right next date
         convert_to_rrule(&mut rrule_result, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
-        let mut test_start_date = Utc.ymd(2019, 03, 15).and_hms(01, 12, 13);
+        let mut test_start_date = Utc
+            .ymd(2019, 03, 15)
+            .and_hms(01, 12, 13)
+            .with_timezone(&UTC);
         assert_eq!(
             test_start_date.with_year(2020).unwrap(),
-            rrule_result.get_next_date(test_start_date)
+            rrule_result
+                .get_next_date(test_start_date)
+                .with_timezone(&UTC)
         )
     }
 
