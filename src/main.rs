@@ -238,44 +238,91 @@ impl<'a> RRule<'a> {
         next_date
     }
 
-    // handles the calculation of next date based on a monthly rule
+    /// Handles the calculation of next date based on a monthly rule.
+    /// Currently supports BYMONTH and BYMONTHDAY params
     fn handle_monthly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut next_date: DateTime<Tz> = start_date;
-        let panic_value: u32 = 50;
-        // use 50 as panic day as it resides outside the bound of permissible parse range for byMonthDay
-        // expression
-        let month_day: u32 = self.by_month_day.first().unwrap_or(&"50").parse().unwrap();
-        if month_day.eq(&panic_value) {
-            // go crazy, we don't like this since if you're asking me to process monthly
-            // I will need a bymonth day present and there is no way I can recover from this
-            panic!("Need a bymonth rrule part when evaluation rules with monthly freq");
-        } else {
-            let start_date_day = start_date.day();
-            if start_date_day < month_day {
-                next_date = next_date.with_day(month_day).unwrap()
-            } else if start_date_day > month_day {
-                if start_date.month().lt(&(12 as u32)) {
-                    let month_added = next_date.with_month(start_date.month() + 1).unwrap();
-                    next_date = month_added.with_day(month_day).unwrap();
-                } else {
-                    let year_added = next_date.with_year(start_date.year() + 1).unwrap();
-                    let month_added = year_added.with_month(1).unwrap();
-                    next_date = month_added.with_day(month_day).unwrap();
-                }
-            } else if start_date_day == month_day {
-                let start_date_with_intervals = self.with_initial_time_intervals(start_date);
+        let mut next_date: DateTime<Tz> = self.with_initial_time_intervals(start_date);
+        let interval: u32 = self.interval.parse().unwrap_or(1);
 
-                // even if its the same day, if we've shot past the time, we will need to schedule
-                // for next month
-                if start_date_with_intervals.ge(&start_date) {
-                    if start_date.month().lt(&(12 as u32)) {
-                        let month_added = next_date.with_month(start_date.month() + 1).unwrap();
-                        next_date = month_added.with_day(month_day).unwrap();
-                    } else {
-                        let year_added = next_date.with_year(start_date.year() + 1).unwrap();
-                        let month_added = year_added.with_month(1).unwrap();
-                        next_date = month_added.with_day(month_day).unwrap();
+        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
+        let by_month_day = self.by_month_day.first().unwrap_or(&"").to_owned();
+        let by_month = self.by_month.first().unwrap_or(&"").to_owned();
+
+        let start_date_day = start_date.day();
+
+        if by_month.is_empty() {
+            if by_month_day.is_empty() {
+                for _i in 0..interval {
+                    next_date = add_month_to_date(next_date);
+                }
+            } else {
+                let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
+                let start_day = start_date.day();
+                if start_day < by_month_day_u32 {
+                    next_date = next_date.with_day(by_month_day_u32).unwrap();
+                    for _i in 0..interval {
+                        next_date = add_month_to_date(next_date);
                     }
+                } else if start_day > by_month_day_u32 {
+                    // move forward a month
+                    next_date = add_month_to_date(next_date);
+                    next_date = next_date.with_day(by_month_day_u32).unwrap();
+                    for _i in 0..interval {
+                        next_date = add_month_to_date(next_date);
+                    }
+                } else if start_day == by_month_day_u32 {
+                    if next_date.ge(&start_date) {
+                        next_date = add_month_to_date(next_date);
+                        next_date = next_date.with_day(by_month_day_u32).unwrap();
+                        for _i in 0..interval {
+                            next_date = add_month_to_date(next_date);
+                        }
+                    } else {
+                        next_date = next_date.with_day(by_month_day_u32).unwrap();
+                        for _i in 0..interval {
+                            next_date = add_month_to_date(next_date);
+                        }
+                    }
+                }
+            }
+        } else {
+            loop {
+                if by_month_day.is_empty() {
+                    for _i in 0..interval {
+                        next_date = add_month_to_date(next_date);
+                    }
+                } else {
+                    let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
+                    let start_day = start_date.day();
+                    if start_day < by_month_day_u32 {
+                        next_date = next_date.with_day(by_month_day_u32).unwrap();
+                        for _i in 0..interval {
+                            next_date = add_month_to_date(next_date);
+                        }
+                    } else if start_day > by_month_day_u32 {
+                        // move forward a month
+                        next_date = add_month_to_date(next_date);
+                        next_date = next_date.with_day(by_month_day_u32).unwrap();
+                        for _i in 0..interval {
+                            next_date = add_month_to_date(next_date);
+                        }
+                    } else if start_day == by_month_day_u32 {
+                        if next_date.ge(&start_date) {
+                            next_date = add_month_to_date(next_date);
+                            next_date = next_date.with_day(by_month_day_u32).unwrap();
+                            for _i in 0..interval {
+                                next_date = add_month_to_date(next_date);
+                            }
+                        } else {
+                            next_date = next_date.with_day(by_month_day_u32).unwrap();
+                            for _i in 0..interval {
+                                next_date = add_month_to_date(next_date);
+                            }
+                        }
+                    }
+                }
+                if next_date.month().eq(&(by_month.parse::<u32>().unwrap())) {
+                    break;
                 }
             }
         }
@@ -287,38 +334,30 @@ impl<'a> RRule<'a> {
     fn handle_weekly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
         // adjust start_date if it does not start on the start
-        let panic_value = "PA";
-        // use 50 as panic day as it resides outside the bound of permissible parse range for byMonthDay
-        // expression
         let by_day = self
             .by_day
             .first()
             .unwrap_or(&chrono_weekday_to_rrule_byday(start_date.weekday()))
             .to_owned();
 
-        if by_day.eq("PA") {
-            // go crazy we don't like this
-            panic!("Need a byDay rrule part when evaluation rules with weekly freq")
-        } else {
-            // now adjust the date to match the start day
-            let in_future = start_date_with_intervals.gt(&start_date);
-            let days_to_adjust =
-                self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
-            start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
+        // now adjust the date to match the start day
+        let in_future = start_date_with_intervals.gt(&start_date);
+        let days_to_adjust =
+            self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
+        start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
 
-            let mut interval: u32 = self.interval.parse().unwrap_or(1);
-            let mut next_date = start_date_with_intervals;
-            for _i in 0..interval {
-                next_date = next_date + Duration::days(7);
-            }
-            let final_days_to_adjust =
-                self.calculate_weekday_distance(by_day, next_date.weekday(), false);
-            // do a final adjustment in case we are going over monthly boundaries
-            // and the calculated date day does not coincide with the one provided
-            // by the client
-            next_date = next_date + Duration::days(final_days_to_adjust);
-            next_date
+        let interval: u32 = self.interval.parse().unwrap_or(1);
+        let mut next_date = start_date_with_intervals;
+        for _i in 0..interval {
+            next_date = next_date + Duration::days(7);
         }
+        let final_days_to_adjust =
+            self.calculate_weekday_distance(by_day, next_date.weekday(), false);
+        // do a final adjustment in case we are going over monthly boundaries
+        // and the calculated date day does not coincide with the one provided
+        // by the client
+        next_date = next_date + Duration::days(final_days_to_adjust);
+        next_date
     }
 
     fn handle_daily(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
@@ -876,6 +915,42 @@ fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
     };
 }
 
+/// Adds a month to a given timezone aware `DateTime` type and takes care of any monthly boundaries
+fn add_month_to_date(date: DateTime<Tz>) -> DateTime<Tz> {
+    let mut date_with_month_added: DateTime<Tz> = date;
+    let year = date.year();
+    match date.month() {
+        2 => {
+            // handle leap years
+            if year % 4 == 0 {
+                if year % 100 == 0 {
+                    if year % 400 == 0 {
+                        date_with_month_added = date_with_month_added + Duration::days(29);
+                    } else {
+                        date_with_month_added = date_with_month_added + Duration::days(28);
+                    }
+                } else {
+                    date_with_month_added = date_with_month_added + Duration::days(29);
+                }
+            } else {
+                date_with_month_added = date_with_month_added + Duration::days(28);
+            }
+        }
+        1 | 3 | 5 | 7 | 9 | 11 => {
+            date_with_month_added = date_with_month_added + Duration::days(31);
+        }
+        4 | 6 | 8 | 10 | 12 => {
+            date_with_month_added = date_with_month_added + Duration::days(30);
+        }
+        _ => {
+            panic!(
+                "Unrecognised month value when adding month to date {:?}",
+                date
+            );
+        }
+    }
+    date_with_month_added
+}
 /// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
 /// forward from, this function
 /// selects the dates that are strictly in the future and returns a modified list
@@ -1199,6 +1274,68 @@ mod tests {
 
         convert_to_rrule(
             &mut rrule_result,
+            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Darwin",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-04-03T09:01:00+09:30".to_owned(),
+                "2019-04-10T09:01:00+09:30".to_owned(),
+                "2019-04-17T09:01:00+09:30".to_owned(),
+                "2019-04-24T09:01:00+09:30".to_owned()
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        );
+    }
+
+    #[test]
+    fn test_daily_rules_work_3() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Brisbane",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-04-03T09:01:00+10:00".to_owned(),
+                "2019-04-10T09:01:00+10:00".to_owned(),
+                "2019-04-17T09:01:00+10:00".to_owned(),
+                "2019-04-24T09:01:00+10:00".to_owned()
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        );
+    }
+
+    #[test]
+    fn test_daily_rules_work_4() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=DAILY;COUNT=6;INTERVAL=5;BYDAY=WE;BYHOUR=12;BYMINUTE=52;DTSTART=20190327T030000;TZID=Singapore",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-05-01T12:52:00+08:00".to_owned(),
+                "2019-06-05T12:52:00+08:00".to_owned(),
+                "2019-07-10T12:52:00+08:00".to_owned(),
+                "2019-08-14T12:52:00+08:00".to_owned(),
+                "2019-09-18T12:52:00+08:00".to_owned(),
+                "2019-10-23T12:52:00+08:00".to_owned(),
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        );
+    }
+
+    #[test]
+    fn test_daily_rules_work_5() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
             "FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000",
         );
 
@@ -1314,7 +1451,43 @@ mod tests {
     }
 
     #[test]
-    fn test_monthly_rules_work_as_expected() {
+    fn test_hourly_rules_work_3() {
+        let mut rrule_result = RRule::new();
+
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=HOURLY;INTERVAL=3;COUNT=20;BYDAY=TH;DTSTART=20190327T030000;TZID=Australia/Sydney",
+        );
+
+        assert_eq!(
+            vec![
+                "2019-03-28T02:00:00+11:00".to_owned(),
+                "2019-03-28T05:00:00+11:00".to_owned(),
+                "2019-03-28T08:00:00+11:00".to_owned(),
+                "2019-03-28T11:00:00+11:00".to_owned(),
+                "2019-03-28T14:00:00+11:00".to_owned(),
+                "2019-03-28T17:00:00+11:00".to_owned(),
+                "2019-03-28T20:00:00+11:00".to_owned(),
+                "2019-03-28T23:00:00+11:00".to_owned(),
+                "2019-04-04T02:00:00+11:00".to_owned(),
+                "2019-04-04T05:00:00+11:00".to_owned(),
+                "2019-04-04T08:00:00+11:00".to_owned(),
+                "2019-04-04T11:00:00+11:00".to_owned(),
+                "2019-04-04T14:00:00+11:00".to_owned(),
+                "2019-04-04T17:00:00+11:00".to_owned(),
+                "2019-04-04T20:00:00+11:00".to_owned(),
+                "2019-04-04T23:00:00+11:00".to_owned(),
+                "2019-04-11T02:00:00+11:00".to_owned(),
+                "2019-04-11T05:00:00+10:00".to_owned(),
+                "2019-04-11T08:00:00+10:00".to_owned(),
+                "2019-04-11T11:00:00+10:00".to_owned(),
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        );
+    }
+
+    #[test]
+    fn test_minutely_rules_work_1() {
         let mut rrule_result = RRule::new();
 
         convert_to_rrule(
@@ -1415,12 +1588,32 @@ mod tests {
     }
 
     #[test]
-    fn test_monthly_rrule() {
+    fn test_monthly_rrule_1() {
         let mut rrule_result = RRule::new();
         // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28",
+        );
+        let mut test_start_date: DateTime<Tz> = Utc
+            .ymd(2019, 03, 15)
+            .and_hms(01, 12, 13)
+            .with_timezone(&UTC);
+        assert_eq!(
+            test_start_date.with_day(28).unwrap(),
+            rrule_result
+                .get_next_date(test_start_date)
+                .with_timezone(&UTC)
+        )
+    }
+
+    #[test]
+    fn test_monthly_rrule_2() {
+        let mut rrule_result = RRule::new();
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190402T10058",
         );
         let mut test_start_date: DateTime<Tz> = Utc
             .ymd(2019, 03, 15)
