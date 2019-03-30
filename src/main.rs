@@ -937,10 +937,10 @@ fn add_month_to_date(date: DateTime<Tz>) -> DateTime<Tz> {
                 date_with_month_added = date_with_month_added + Duration::days(28);
             }
         }
-        1 | 3 | 5 | 7 | 9 | 11 => {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => {
             date_with_month_added = date_with_month_added + Duration::days(31);
         }
-        4 | 6 | 8 | 10 | 12 => {
+        4 | 6 | 9 | 11 => {
             date_with_month_added = date_with_month_added + Duration::days(30);
         }
         _ => {
@@ -1611,8 +1611,64 @@ mod tests {
             "FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne",
         );
         assert_eq!(
-            vec!["2019-04-28T12:12:13+10:00".to_owned(),
-                 "2019-05-28T12:12:13+10:00".to_owned()],
+            vec![
+                "2019-04-28T12:12:13+10:00".to_owned(),
+                "2019-05-28T12:12:13+10:00".to_owned()
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        )
+    }
+
+    #[test]
+    fn test_monthly_rrule_3() {
+        let mut rrule_result = RRule::new();
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne",
+        );
+        assert_eq!(
+            vec![
+                "2019-06-02T12:12:13+11:00".to_owned(),
+                "2020-06-02T12:12:13+10:00".to_owned(),
+                "2021-06-02T12:12:13+10:00".to_owned(),
+                "2022-06-02T12:12:13+10:00".to_owned(),
+                "2023-06-02T12:12:13+10:00".to_owned(),
+                "2024-06-02T12:12:13+10:00".to_owned(),
+                "2025-06-02T12:12:13+10:00".to_owned(),
+                "2026-06-02T12:12:13+10:00".to_owned(),
+                "2027-06-02T12:12:13+10:00".to_owned(),
+                "2028-06-02T12:12:13+10:00".to_owned(),
+                "2029-06-02T12:12:13+10:00".to_owned(),
+                "2030-06-02T12:12:13+10:00".to_owned()
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        )
+    }
+
+    #[test]
+    fn test_monthly_rrule_4() {
+        let mut rrule_result = RRule::new();
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=11;BYMONTHDAY=12;DTSTART=20190402T011213;TZID=Australia/Sydney",
+        );
+        assert_eq!(
+            vec![
+                "2019-11-12T12:12:13+11:00".to_owned(),
+                "2020-11-12T12:12:13+11:00".to_owned(),
+                "2021-11-12T12:12:13+11:00".to_owned(),
+                "2022-11-12T12:12:13+11:00".to_owned(),
+                "2023-11-12T12:12:13+11:00".to_owned(),
+                "2024-11-12T12:12:13+11:00".to_owned(),
+                "2025-11-12T12:12:13+11:00".to_owned(),
+                "2026-11-12T12:12:13+11:00".to_owned(),
+                "2027-11-12T12:12:13+11:00".to_owned(),
+                "2028-11-12T12:12:13+11:00".to_owned(),
+                "2029-11-12T12:12:13+11:00".to_owned(),
+                "2030-11-12T12:12:13+11:00".to_owned()
+            ],
             rrule_result.get_all_iter_dates_iso8601()
         )
     }
