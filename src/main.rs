@@ -260,7 +260,8 @@ impl<'a> RRule<'a> {
                 let start_day = start_date.day();
                 if start_day < by_month_day_u32 {
                     next_date = next_date.with_day(by_month_day_u32).unwrap();
-                    for _i in 0..interval {
+                    // here we start the interval at 1 since movement by day above counts as an inital monthly move
+                    for _i in 1..interval {
                         next_date = add_month_to_date(next_date);
                     }
                 } else if start_day > by_month_day_u32 {
@@ -271,7 +272,7 @@ impl<'a> RRule<'a> {
                         next_date = add_month_to_date(next_date);
                     }
                 } else if start_day == by_month_day_u32 {
-                    if next_date.ge(&start_date) {
+                    if next_date.gt(&start_date) {
                         next_date = add_month_to_date(next_date);
                         next_date = next_date.with_day(by_month_day_u32).unwrap();
                         for _i in 0..interval {
@@ -1593,17 +1594,11 @@ mod tests {
         // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28",
+            "FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190315T011213;TZID=UTC",
         );
-        let mut test_start_date: DateTime<Tz> = Utc
-            .ymd(2019, 03, 15)
-            .and_hms(01, 12, 13)
-            .with_timezone(&UTC);
         assert_eq!(
-            test_start_date.with_day(28).unwrap(),
-            rrule_result
-                .get_next_date(test_start_date)
-                .with_timezone(&UTC)
+            vec!["2019-03-28T09:01:13+00:00".to_owned()],
+            rrule_result.get_all_iter_dates_iso8601()
         )
     }
 
@@ -1613,17 +1608,12 @@ mod tests {
         // test we get the right next date
         convert_to_rrule(
             &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190402T10058",
+            "FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne",
         );
-        let mut test_start_date: DateTime<Tz> = Utc
-            .ymd(2019, 03, 15)
-            .and_hms(01, 12, 13)
-            .with_timezone(&UTC);
         assert_eq!(
-            test_start_date.with_day(28).unwrap(),
-            rrule_result
-                .get_next_date(test_start_date)
-                .with_timezone(&UTC)
+            vec!["2019-04-28T12:12:13+10:00".to_owned(),
+                 "2019-05-28T12:12:13+10:00".to_owned()],
+            rrule_result.get_all_iter_dates_iso8601()
         )
     }
 
