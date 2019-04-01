@@ -9,6 +9,7 @@ args:
       help: Provide an rrule string to process
       takes_value: true
       required: true
+      index: 1
   - count:
       short: ct
       long: count

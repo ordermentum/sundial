@@ -1644,7 +1644,7 @@ mod tests {
             &mut rrule_result,
             "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500",
         );
-        let mut iter_dates = rrule_result.get_all_iter_dates();
+        let mut iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Tue, date.weekday());
@@ -1659,7 +1659,7 @@ mod tests {
         let mut rrule_result = RRule::new();
 
         convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
-        let iter_dates = rrule_result.get_all_iter_dates();
+        let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Thu, date.weekday());
@@ -1674,7 +1674,7 @@ mod tests {
         let mut rrule_result = RRule::new();
 
         convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
-        let iter_dates = rrule_result.get_all_iter_dates();
+        let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Thu, date.weekday());
