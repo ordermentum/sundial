@@ -12,7 +12,7 @@ Sundial is a library written in pure [Rust](https://www.rust-lang.org/) which pa
 
 ### RFC5545 spec features supported
 
-Since the library is designed purely to support the [RRules section of the spec](https://tools.ietf.org/html/rfc5545#section-3.3.10) at the moment, features will be added iteratively for each type of RRule support:
+Since the library is designed purely to support the [RRules section of the spec](https://tools.ietf.org/html/rfc5545#section-3.3.10) at the moment, features will be added iteratively for each type of RRule support (note: all frequency types fully support: COUNT, INTERVAL, DTSTART and UNTIL):
 
 | RRULE FREQUENCY | SUPPORTED RRULE Parts                           |
 |-----------------|-------------------------------------------------|
