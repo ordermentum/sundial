@@ -1212,24 +1212,18 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 fn main() {
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
+    let rrule = matches.value_of("rrule").unwrap_or("");
+
+    if rrule.is_empty() {
+        panic!("rrule string cannot be empty, use -h argument to view help");
+    }
+
     let count = matches.value_of("count").unwrap_or("");
     let interval = matches.value_of("until").unwrap_or("");
-    let s =
-        "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000;TZID=Australia/Sydney".to_owned();
     let mut rrule_result = RRule::new();
-    convert_to_rrule(&mut rrule_result, &s);
-
-    println!("Rrule is {:?}", rrule_result.to_json());
+    convert_to_rrule(&mut rrule_result, rrule);
     println!(
-        "All iter dates are {:?}",
-        rrule_result.get_all_iter_dates(count, interval)
-    );
-    println!(
-        "Next dates are {:?}",
-        rrule_result.get_next_iter_dates(count, interval)
-    );
-    println!(
-        "ISO8601 dates are {:?}",
+        "{:?}",
         rrule_result.get_all_iter_dates_iso8601(count, interval)
     );
 }

@@ -1,4 +1,4 @@
-## Sundial 🚧
+## Sundial
 
 Sundial is a library written in pure [Rust](https://www.rust-lang.org/) which partially implements the [iCalendar spec](https://tools.ietf.org/html/rfc5545) to support parsing of RRules.
 
@@ -14,150 +14,74 @@ Sundial is a library written in pure [Rust](https://www.rust-lang.org/) which pa
 
 Since the library is designed purely to support the [RRules section of the spec](https://tools.ietf.org/html/rfc5545#section-3.3.10) at the moment, features will be added iteratively for each type of RRule support:
 
-
-|            | SECONDLY      | MINUTELY      | HOURLY        | DAILY         | WEEKLY        | FORTNIGHTLY   | MONTHLY       | YEARLY        |
-|------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|
-| COUNT      | <ul><li>- []</li></ul> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- []</li> | <li>- [x] YES</li>| <li>- [x]</li>|
-| INTERVAL   | []            | []            | []            | []            | []            | []            | [x]           | [x]           |
-| BYMONTH    | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYWEEKNO   | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | N/A           | []            |
-| BYYEARDAY  | []            | []            | []            | N/A           | N/A           | N/A           | []            | []            |
-| BYMONTHDAY | []            | []            | []            | []            | []            | N/A           | [x]           | []            |
-| BYDAY      | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYHOUR     | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYMINUTE   | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYSECOND   | []            | []            | []            | []            | []            | []            | [x]           | []            |
-| BYSETPOS   | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           | N/S           |
-
-* Checked boxes mean the feature is supported
-* Unchecked means feature is not supported but will be in future releases
-* N/A means the feature is not applicable for the RRule type per the spec
-* N/S means the feature will not be support at present by this library
+| RRULE FREQUENCY | SUPPORTED RRULE Parts                           |
+|-----------------|-------------------------------------------------|
+| YEARLY          | BYHOUR, BYMINUTE, BYSECOND                      |
+| MONTHLY         | BYMONTH, BYMONTHDAY, BYHOUR, BYMINUTE, BYSECOND |
+| WEEKLY          | BYDAY, BYHOUR, BYMINUTE, BYSECOND               |
+| DAILY           | BYDAY, BYMONTH, BYHOUR, BYMINUTE, BYSECOND      |
+| HOURLY          | BYDAY, BYMONTH, BYHOUR, BYMINUTE, BYSECOND      |
+| MINUTELY        | BYDAY, BYMONTH, BYHOUR, BYMINUTE, BYSECOND      |
+| SECONDLY        | BYDAY, BYMONTH, BYHOUR, BYMINUTE                |
 
 
-Timezones Supported:
+Timezones support is provided via [chrono_tz](https://github.com/chronotope/chrono-tz) and all supported timezones in chrono-tz are supported out of the box. At the moment this library does not support custom timezones.
 
+### Usage:
+
+The packages compiles to a native binary and can be run simply as a simple sys call.
+
+To view help:
+```bash
+./sundial -h
 ```
-Africa/Nairobi
-Africa/Abidjan
-America/Argentina/Catamarca
-America/Adak
-America/Argentina/Buenos_Aires
-America/Argentina/Catamarca
-America/Atikokan
-America/Argentina/Cordoba
-America/Tijuana
-America/Indiana/Indianapolis
-America/Indiana/Indianapolis
-America/Argentina/Jujuy
-America/Indiana/Knox
-America/Kentucky/Louisville
-America/Argentina/Mendoza
-America/Toronto
-America/Rio_Branco
-America/Argentina/Cordoba
-America/Tijuana
-America/Denver
-America/Port_of_Spain
-Pacific/Auckland
-Asia/Ashgabat
-Asia/Kolkata
-Asia/Shanghai
-Asia/Shanghai
-Asia/Dhaka
-Asia/Shanghai
-Asia/Urumqi
-Asia/Kathmandu
-Asia/Macau
-Asia/Yangon
-Asia/Ho_Chi_Minh
-Asia/Jerusalem
-Asia/Thimphu
-Asia/Makassar
-Asia/Ulaanbaatar
-Atlantic/Faroe
-Europe/Oslo
-Australia/Sydney
-Australia/Sydney
-Australia/Lord_Howe
-Australia/Sydney
-Australia/Darwin
-Australia/Brisbane
-Australia/Adelaide
-Australia/Hobart
-Australia/Melbourne
-Australia/Perth
-Australia/Broken_Hill
-America/Rio_Branco
-America/Noronha
-America/Sao_Paulo
-America/Manaus
-America/Halifax
-America/Winnipeg
-America/Regina
-America/Toronto
-America/Edmonton
-America/St_Johns
-America/Vancouver
-America/Regina
-America/Whitehorse
-America/Santiago
-Pacific/Easter
-America/Havana
-Africa/Cairo
-Europe/Dublin
-Europe/London
-Europe/Chisinau
-Europe/London
-Europe/London
-Etc/GMT
-Etc/GMT
-Etc/GMT
-Etc/GMT
-Asia/Hong_Kong
-Atlantic/Reykjavik
-Asia/Tehran
-Asia/Jerusalem
-America/Jamaica
-Asia/Tokyo
-Pacific/Kwajalein
-Africa/Tripoli
-America/Tijuana
-America/Mazatlan
-America/Mexico_City
-Pacific/Auckland
-Pacific/Chatham
-America/Denver
-Asia/Shanghai
-Pacific/Honolulu
-Pacific/Pohnpei
-Pacific/Pago_Pago
-Pacific/Chuuk
-Pacific/Chuuk
-Europe/Warsaw
-Europe/Lisbon
-Asia/Taipei
-Asia/Seoul
-Asia/Singapore
-Europe/Istanbul
-Etc/UCT
-America/Anchorage
-America/Adak
-America/Phoenix
-America/Chicago
-America/Indiana/Indianapolis
-America/New_York
-Pacific/Honolulu
-America/Indiana/Knox
-America/Detroit
-America/Denver
-America/Los_Angeles
-Pacific/Pago_Pago
-Etc/UTC
-Etc/UTC
-Europe/Moscow
-Etc/UTC
+
+To parse and get the iter dates from an rrule string:
+
+```bash
+./sundial --rrule 'Enter your rrule string here'
 ```
+
+example, running the following:
+
+```bash
+./sundial 'FREQ=WEEKLY;INTERVAL=2;COUNT=12;BYHOUR=0;BYMINUTE=0;DTSTART=20190101T030000'
+```
+
+gives the results:
+
+```json
+[
+  "2019-01-15T00:00:00+00:00",
+  "2019-01-29T00:00:00+00:00",
+  "2019-02-12T00:00:00+00:00",
+  "2019-02-26T00:00:00+00:00",
+  "2019-03-12T00:00:00+00:00",
+  "2019-03-26T00:00:00+00:00",
+  "2019-04-09T00:00:00+00:00",
+  "2019-04-23T00:00:00+00:00",
+  "2019-05-07T00:00:00+00:00",
+  "2019-05-21T00:00:00+00:00",
+  "2019-06-04T00:00:00+00:00",
+  "2019-06-18T00:00:00+00:00"
+]
+```
+
+We also support specifying count and until as OPTIONAL command line arguments (please not these will override COUNT and UNTIL parts of the provided rrule string if it contains any):
+
+```bashl
+./sundial --rrule <rrule_string> -ct 25 -ul 20220123T030000
+```
+
+OR
+
+```bashl
+./sundial --rrule <rrule_string> --count 25 --until 20220123T030000
+```
+
+This will give you the results of the rrule string intervals bounded by the count value of 25 or until 23/12/2022 3 am UTC, whichever comes first.
+
+Note that we currently only support parsing the until value argument as UTC date.
 
 ### Useful Resources
 - [RRule Demo](https://jakubroztocil.github.io/rrule/)
