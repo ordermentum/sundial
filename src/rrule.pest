@@ -7,6 +7,7 @@ recur_exprs = _{ (recur_expr ~ ";") | recur_expr }
 
 recur_expr = _{ dtstart_expr_with_tz |
                 dtstart_expr_without_tz |
+                until_expr_without_tz |
                 freq_expr |
                 interval_expr |
                 count_expr |
@@ -22,10 +23,13 @@ recur_expr = _{ dtstart_expr_with_tz |
 
 dtstart_expr_with_tz = { "DTSTART;TZID=" ~ dtstart_field_with_tz }
 dtstart_expr_without_tz = { "DTSTART=" ~ dtstart_field_without_tz }
-dtstart_field_with_tz  = { dtstart_tz_with_underscore | dtstart_tz_without_underscore }
+dtstart_field_with_tz  = { tz_with_underscore | tz_without_underscore }
 dtstart_field_without_tz = { ASCII_ALPHANUMERIC* }
-dtstart_tz_with_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ "_" ~ ASCII_ALPHA * ~ ":" ~ ASCII_ALPHANUMERIC* }
-dtstart_tz_without_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ ":" ~ ASCII_ALPHANUMERIC* }
+tz_with_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ "_" ~ ASCII_ALPHA * ~ ":" ~ ASCII_ALPHANUMERIC* }
+tz_without_underscore = _{ ASCII_ALPHA* ~ "/" ~ ASCII_ALPHA* ~ ":" ~ ASCII_ALPHANUMERIC* }
+
+until_expr_without_tz = { "UNTIL=" ~ until_field_without_tz }
+until_field_without_tz = { ASCII_ALPHANUMERIC* }
 
 freq_expr = { "FREQ=" ~ freq_field }
 freq_field = { secondly | minutely | hourly | daily | weekly | fortnightly | monthly | yearly }

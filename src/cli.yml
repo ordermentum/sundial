@@ -1,0 +1,24 @@
+name: sundial
+version: "0.1"
+about: Rust Rrule parsing library based on the iCalendar spec
+args:
+  - rrule:
+      short: rl
+      long: rrule
+      value_name: rrule
+      help: Provide an rrule string to process
+      takes_value: true
+      required: true
+      index: 1
+  - count:
+      short: ct
+      long: count
+      value_name: count
+      help: Provide a custom count to override RRule COUNT part
+      takes_value: true
+  - until:
+      short: ul
+      long: until
+      value_name: until
+      help: Provide a custom until date to override RRule UNTIL part
+      takes_value: true
