@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate pest_derive;
+#[macro_use]
+extern crate clap;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
@@ -10,6 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::env;
 use std::str::FromStr;
+use clap::App;
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
@@ -114,7 +117,7 @@ impl<'a> RRule<'a> {
 
     // show me the money
     // parent function that can get a list of all future iterations based on count
-    fn get_all_iter_dates(&self) -> Vec<DateTime<Tz>> {
+    fn get_all_iter_dates(&self, count_from_args: &str, until_from_args: &str) -> Vec<DateTime<Tz>> {
         let timezone: Tz = if self.tzid.is_empty() {
             "UTC".parse().unwrap()
         } else {
@@ -131,7 +134,9 @@ impl<'a> RRule<'a> {
                 .with_timezone(&timezone)
         };
 
-        let mut count: i8 = 52; // default count of iterations to build
+        let mut count: i32 = 52; // default count of iterations to build
+
+        let mut until = "";
 
         // assign default weekstart and reassign if present
         let mut wkst = "MO";
@@ -140,21 +145,35 @@ impl<'a> RRule<'a> {
             wkst = &self.wkst
         }
 
-        if !self.count.is_empty() {
-            count = self.count.parse().unwrap()
+        // set count
+        if count_from_args.is_empty() {
+            if !self.count.is_empty() {
+                count = self.count.parse().unwrap()
+            }
+        } else {
+            count = count_from_args.parse::<i32>().unwrap();
         }
+
+        if until_from_args.is_empty() {
+            if !self.until.is_empty() {
+                until = &self.until;
+            }
+        } else {
+            until = until_from_args;
+        }
+
 
         let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
 
-        if self.until.is_empty() {
+        if until.is_empty() {
             for _i in 0..count {
                 next_date = self.get_next_date(next_date);
                 next_dates_list.push(next_date);
             }
         } else {
             let until_date: DateTime<Tz> = Utc
-                .datetime_from_str(&self.until, "%Y-%m-%d %H:%M:%S")
+                .datetime_from_str(&until, "%Y-%m-%d %H:%M:%S")
                 .unwrap()
                 .with_timezone(&timezone);
             for _i in 0..count {
@@ -168,18 +187,19 @@ impl<'a> RRule<'a> {
         next_dates_list
     }
 
-    fn get_all_iter_dates_iso8601(&self) -> Vec<String> {
-        convert_datetime_tz_list_to_rfc339(self.get_all_iter_dates())
+    fn get_all_iter_dates_iso8601(&self, count_from_args: &str, until_from_args: &str) -> Vec<String> {
+        convert_datetime_tz_list_to_rfc339(self.get_all_iter_dates(count_from_args, until_from_args))
     }
 
-    fn get_next_iter_dates(&self) -> Vec<DateTime<Tz>> {
+
+    fn get_next_iter_dates(&self, count_from_args: &str, until_from_args: &str) -> Vec<DateTime<Tz>> {
         let timezone: Tz = if self.tzid.is_empty() {
             "UTC".parse().unwrap()
         } else {
             self.tzid.parse().unwrap()
         };
         lens_iter_dates(
-            self.get_all_iter_dates(),
+            self.get_all_iter_dates(count_from_args, until_from_args),
             Utc::now().with_timezone(&timezone),
         )
     }
@@ -1178,18 +1198,21 @@ fn generate_rrule_from_json(json: &str) -> RRule {
 // ToDo : Add validation for checking that the RRULE string was properly extracted from the parser
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let yaml = load_yaml!("cli.yml");
+    let matches = App::from_yaml(yaml).get_matches();
+    let count = matches.value_of("count").unwrap_or("");
+    let interval = matches.value_of("until").unwrap_or("");
     let s =
         "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000;TZID=Australia/Sydney".to_owned();
     let mut rrule_result = RRule::new();
     convert_to_rrule(&mut rrule_result, &s);
 
     println!("Rrule is {:?}", rrule_result.to_json());
-    println!("All iter dates are {:?}", rrule_result.get_all_iter_dates());
-    println!("Next dates are {:?}", rrule_result.get_next_iter_dates());
+    println!("All iter dates are {:?}", rrule_result.get_all_iter_dates(count, interval));
+    println!("Next dates are {:?}", rrule_result.get_next_iter_dates(count, interval));
     println!(
         "ISO8601 dates are {:?}",
-        rrule_result.get_all_iter_dates_iso8601()
+        rrule_result.get_all_iter_dates_iso8601(count, interval)
     );
 }
 
@@ -1297,7 +1320,7 @@ mod tests {
             &mut rrule_result,
             "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         );
-        assert_eq!(27, rrule_result.get_next_iter_dates().len())
+        assert_eq!(27, rrule_result.get_next_iter_dates("", "").len())
     }
 
     #[test]
@@ -1326,7 +1349,7 @@ mod tests {
                 "2020-04-27T09:35:00+00:00".to_owned(),
                 "2020-05-27T09:35:00+00:00".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         )
     }
 
@@ -1347,7 +1370,7 @@ mod tests {
                 "2019-04-24 09:01:00".to_owned()
             ],
             rrule_result
-                .get_all_iter_dates()
+                .get_all_iter_dates("", "")
                 .iter()
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
@@ -1370,7 +1393,7 @@ mod tests {
                 "2019-04-17T09:01:00+09:30".to_owned(),
                 "2019-04-24T09:01:00+09:30".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         );
     }
 
@@ -1390,7 +1413,7 @@ mod tests {
                 "2019-04-17T09:01:00+10:00".to_owned(),
                 "2019-04-24T09:01:00+10:00".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         );
     }
 
@@ -1412,7 +1435,7 @@ mod tests {
                 "2019-09-18T12:52:00+08:00".to_owned(),
                 "2019-10-23T12:52:00+08:00".to_owned(),
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         );
     }
 
@@ -1449,7 +1472,7 @@ mod tests {
                 "2032-11-19 10:01:58".to_owned(),
             ],
             rrule_result
-                .get_all_iter_dates()
+                .get_all_iter_dates("", "")
                 .iter()
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
@@ -1489,7 +1512,7 @@ mod tests {
                 "2019-03-29 15:00:00".to_owned(),
             ],
             rrule_result
-                .get_all_iter_dates()
+                .get_all_iter_dates("", "")
                 .iter()
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
@@ -1529,7 +1552,7 @@ mod tests {
                 "2019-08-13 09:12:00".to_owned(),
             ],
             rrule_result
-                .get_all_iter_dates()
+                .get_all_iter_dates("", "")
                 .iter()
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
@@ -1568,7 +1591,7 @@ mod tests {
                 "2019-04-11T08:00:00+10:00".to_owned(),
                 "2019-04-11T11:00:00+10:00".to_owned(),
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         );
     }
 
@@ -1605,7 +1628,7 @@ mod tests {
                 "2019-03-27 04:00:00".to_owned()
             ],
             rrule_result
-                .get_all_iter_dates()
+                .get_all_iter_dates("", "")
                 .iter()
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
@@ -1671,7 +1694,7 @@ mod tests {
         );
         assert_eq!(
             vec!["2019-03-28T09:01:13+00:00".to_owned()],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         )
     }
 
@@ -1688,7 +1711,7 @@ mod tests {
                 "2019-04-28T12:12:13+10:00".to_owned(),
                 "2019-05-28T12:12:13+10:00".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         )
     }
 
@@ -1715,7 +1738,7 @@ mod tests {
                 "2029-06-02T12:12:13+10:00".to_owned(),
                 "2030-06-02T12:12:13+10:00".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         )
     }
 
@@ -1742,7 +1765,7 @@ mod tests {
                 "2029-11-12T12:12:13+11:00".to_owned(),
                 "2030-11-12T12:12:13+11:00".to_owned()
             ],
-            rrule_result.get_all_iter_dates_iso8601()
+            rrule_result.get_all_iter_dates_iso8601("", "")
         )
     }
 
