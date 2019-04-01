@@ -26,6 +26,9 @@ struct RRule<'a> {
     dtstart: String,
     #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
+    until: String,
+    #[serde(default = "default_rrule_string_field")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     frequency: String,
     #[serde(default = "default_rrule_string_field")]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -86,6 +89,7 @@ impl<'a> RRule<'a> {
         return RRule {
             tzid: String::from(""),
             dtstart: String::from(""),
+            until: String::from(""),
             frequency: String::from(""),
             count: String::from(""),
             interval: String::from(""),
@@ -142,9 +146,24 @@ impl<'a> RRule<'a> {
 
         let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
-        for _i in 0..count {
-            next_date = self.get_next_date(next_date);
-            next_dates_list.push(next_date);
+
+        if self.until.is_empty() {
+            for _i in 0..count {
+                next_date = self.get_next_date(next_date);
+                next_dates_list.push(next_date);
+            }
+        } else {
+            let until_date: DateTime<Tz> = Utc
+                .datetime_from_str(&self.until, "%Y-%m-%d %H:%M:%S")
+                .unwrap()
+                .with_timezone(&timezone);
+            for _i in 0..count {
+                next_date = self.get_next_date(next_date);
+                if next_date.gt(&until_date) {
+                    break;
+                }
+                next_dates_list.push(next_date);
+            }
         }
         next_dates_list
     }
@@ -1046,6 +1065,22 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
                 }
             }
 
+            Rule::until_expr_without_tz => {
+                let non_validated_until: String =
+                    line.into_inner().next().unwrap().as_str().to_string();
+                if non_validated_until.contains("Z") {
+                    let naive_date =
+                        NaiveDateTime::parse_from_str(&non_validated_until, "%Y%m%dT%H%M%SZ")
+                            .unwrap();
+                    rrule_result.until = naive_date.to_string();
+                } else {
+                    let naive_date =
+                        NaiveDateTime::parse_from_str(&non_validated_until, "%Y%m%dT%H%M%S")
+                            .unwrap();
+                    rrule_result.until = naive_date.to_string();
+                }
+            }
+
             Rule::freq_expr => {
                 rrule_result.frequency = line.into_inner().next().unwrap().as_str().to_string();
             }
@@ -1233,6 +1268,14 @@ mod tests {
             RRuleTestCase {
                 rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000",
                 expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;UNTIL=20190422T133500;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000",
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","until":"2019-04-22 13:35:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
+            },
+            RRuleTestCase {
+                rrule_string: "FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Australia/Perth;DTSTART=19970714T133000;UNTIL=21330422T133500Z",
+                expected_flat_json: r#"{"tzid":"Australia/Perth","dtstart":"1997-07-14 13:30:00","until":"2133-04-22 13:35:00","frequency":"WEEKLY","interval":"1","byHour":["8","12"],"byMinute":["30","45"],"byDay":["TU","SU"]}"#,
             }
         ];
 
@@ -1243,6 +1286,48 @@ mod tests {
 
             assert_eq!(i.expected_flat_json, rrule_result.to_json())
         }
+    }
+
+    #[test]
+    fn test_we_use_the_count_properly() {
+        let mut rrule_result = RRule::new();
+
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
+        assert_eq!(27, rrule_result.get_next_iter_dates().len())
+    }
+
+    #[test]
+    fn test_until_params_works() {
+        let mut rrule_result = RRule::new();
+
+        // test we get the right next date
+        convert_to_rrule(
+            &mut rrule_result,
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;DTSTART=20190327T133500;UNTIL=20200612T030000",
+        );
+        assert_eq!(
+            vec![
+                "2019-04-27T09:35:00+00:00".to_owned(),
+                "2019-05-27T09:35:00+00:00".to_owned(),
+                "2019-06-27T09:35:00+00:00".to_owned(),
+                "2019-07-27T09:35:00+00:00".to_owned(),
+                "2019-08-27T09:35:00+00:00".to_owned(),
+                "2019-09-27T09:35:00+00:00".to_owned(),
+                "2019-10-27T09:35:00+00:00".to_owned(),
+                "2019-11-27T09:35:00+00:00".to_owned(),
+                "2019-12-27T09:35:00+00:00".to_owned(),
+                "2020-01-27T09:35:00+00:00".to_owned(),
+                "2020-02-27T09:35:00+00:00".to_owned(),
+                "2020-03-27T09:35:00+00:00".to_owned(),
+                "2020-04-27T09:35:00+00:00".to_owned(),
+                "2020-05-27T09:35:00+00:00".to_owned()
+            ],
+            rrule_result.get_all_iter_dates_iso8601()
+        )
     }
 
     #[test]
@@ -1525,18 +1610,6 @@ mod tests {
                 .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
                 .collect::<Vec<String>>()
         );
-    }
-
-    #[test]
-    fn test_we_use_the_count_properly() {
-        let mut rrule_result = RRule::new();
-
-        // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
-        );
-        assert_eq!(27, rrule_result.get_next_iter_dates().len())
     }
 
     #[test]
