@@ -6,13 +6,13 @@ extern crate clap;
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use chrono_tz::Tz;
+use clap::App;
 use pest::Parser;
 use serde::de::value::StrDeserializer;
 use serde::Deserialize;
 use serde::Serialize;
 use std::env;
 use std::str::FromStr;
-use clap::App;
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
@@ -117,7 +117,11 @@ impl<'a> RRule<'a> {
 
     // show me the money
     // parent function that can get a list of all future iterations based on count
-    fn get_all_iter_dates(&self, count_from_args: &str, until_from_args: &str) -> Vec<DateTime<Tz>> {
+    fn get_all_iter_dates(
+        &self,
+        count_from_args: &str,
+        until_from_args: &str,
+    ) -> Vec<DateTime<Tz>> {
         let timezone: Tz = if self.tzid.is_empty() {
             "UTC".parse().unwrap()
         } else {
@@ -162,7 +166,6 @@ impl<'a> RRule<'a> {
             until = until_from_args;
         }
 
-
         let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
 
@@ -187,12 +190,21 @@ impl<'a> RRule<'a> {
         next_dates_list
     }
 
-    fn get_all_iter_dates_iso8601(&self, count_from_args: &str, until_from_args: &str) -> Vec<String> {
-        convert_datetime_tz_list_to_rfc339(self.get_all_iter_dates(count_from_args, until_from_args))
+    fn get_all_iter_dates_iso8601(
+        &self,
+        count_from_args: &str,
+        until_from_args: &str,
+    ) -> Vec<String> {
+        convert_datetime_tz_list_to_rfc339(
+            self.get_all_iter_dates(count_from_args, until_from_args),
+        )
     }
 
-
-    fn get_next_iter_dates(&self, count_from_args: &str, until_from_args: &str) -> Vec<DateTime<Tz>> {
+    fn get_next_iter_dates(
+        &self,
+        count_from_args: &str,
+        until_from_args: &str,
+    ) -> Vec<DateTime<Tz>> {
         let timezone: Tz = if self.tzid.is_empty() {
             "UTC".parse().unwrap()
         } else {
@@ -1208,8 +1220,14 @@ fn main() {
     convert_to_rrule(&mut rrule_result, &s);
 
     println!("Rrule is {:?}", rrule_result.to_json());
-    println!("All iter dates are {:?}", rrule_result.get_all_iter_dates(count, interval));
-    println!("Next dates are {:?}", rrule_result.get_next_iter_dates(count, interval));
+    println!(
+        "All iter dates are {:?}",
+        rrule_result.get_all_iter_dates(count, interval)
+    );
+    println!(
+        "Next dates are {:?}",
+        rrule_result.get_next_iter_dates(count, interval)
+    );
     println!(
         "ISO8601 dates are {:?}",
         rrule_result.get_all_iter_dates_iso8601(count, interval)
