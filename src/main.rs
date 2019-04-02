@@ -1038,7 +1038,6 @@ pub struct ParseError {
 
 /// Converts and rrule string to a rrule struct
 fn convert_to_rrule(rrule_string: &str) -> RRule {
-
     let mut rrule_result = RRule::new();
 
     let parse_result = RRuleParser::parse(Rule::expr, rrule_string)
@@ -1203,49 +1202,103 @@ fn convert_to_rrule(rrule_string: &str) -> RRule {
             _ => {}
         }
     }
+    validate_rrule(&rrule_result);
     rrule_result
 }
 
-pub fn validate_rrule(rrule: &mut RRule) {
+fn validate_rrule(rrule: &RRule) {
     // validate byhour
     if !rrule.by_hour.is_empty() {
-        if rrule.by_hour.iter().find(|x| *x > 23).is_some() {
-            panic!("BYHOUR can only be in range 0-23 | Provided value {:?}", rrule.by_hour);
+        if rrule
+            .by_hour
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| *x > 23)
+            .is_some()
+        {
+            panic!(
+                "BYHOUR can only be in range 0-23 | Provided value {:?}",
+                rrule.by_hour
+            );
         }
     }
 
     // validate byminute
     if !rrule.by_minute.is_empty() {
-        if rrule.by_minute.iter().find(|x| *x > 59).is_some() {
-            panic!("BYMINUTE can only be in range 0-59 | Provided value {:?}", rrule.by_minute);
+        if rrule
+            .by_minute
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| *x > 59)
+            .is_some()
+        {
+            panic!(
+                "BYMINUTE can only be in range 0-59 | Provided value {:?}",
+                rrule.by_minute
+            );
         }
     }
 
     // validate bysecond
     if !rrule.by_second.is_empty() {
-        if rrule.by_second.iter().find(|x| *x > 60).is_some() {
-            panic!("BYSECOND can only be in range 0-60 | Provided value {:?}", rrule.by_second);
+        if rrule
+            .by_second
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| *x > 60)
+            .is_some()
+        {
+            panic!(
+                "BYSECOND can only be in range 0-60 | Provided value {:?}",
+                rrule.by_second
+            );
         }
-
     }
     // validate bymonthday
     if !rrule.by_month_day.is_empty() {
-        if rrule.by_month_day.iter().find(|x| (*x > 31 || *x < 1)).is_some() {
-            panic!("BYMONTHDAY can only be in range 1-31 | Provided value {:?}", rrule.by_month_day);
+        if rrule
+            .by_month_day
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| (*x > 31 || *x < 1))
+            .is_some()
+        {
+            panic!(
+                "BYMONTHDAY can only be in range 1-31 | Provided value {:?}",
+                rrule.by_month_day
+            );
         }
     }
 
     // validate bymonth
     if !rrule.by_month.is_empty() {
-        if rrule.by_month.iter().find(|x| (*x > 12 || *x < 1)).is_some() {
-            panic!("BYMONTH can only be in range 1-12 | Provided value {:?}", rrule.by_month);
+        if rrule
+            .by_month
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| (*x > 12 || *x < 1))
+            .is_some()
+        {
+            panic!(
+                "BYMONTH can only be in range 1-12 | Provided value {:?}",
+                rrule.by_month
+            );
         }
     }
 
     // validate byyearday
     if !rrule.by_year_day.is_empty() {
-        if rrule.by_year_day.iter().find(|x| (*x > 366 || *x < 1)).is_some() {
-            panic!("BYYEARDAY can only be in range 1-366 | Provided value {:?}", rrule.by_year_day);
+        if rrule
+            .by_year_day
+            .iter()
+            .map(|x| x.parse::<u32>().unwrap())
+            .find(|x| (*x > 366 || *x < 1))
+            .is_some()
+        {
+            panic!(
+                "BYYEARDAY can only be in range 1-366 | Provided value {:?}",
+                rrule.by_year_day
+            );
         }
     }
 
@@ -1253,7 +1306,10 @@ pub fn validate_rrule(rrule: &mut RRule) {
     if !rrule.tzid.is_empty() {
         let tz = rrule.tzid.parse::<Tz>();
         if tz.is_err() {
-            panic!("Timezone ID: {:?} is not recognised, please try an IANA recognised tzid", rrule.tzid);
+            panic!(
+                "Timezone ID: {:?} is not recognised, please try an IANA recognised tzid",
+                rrule.tzid
+            );
         }
     }
 }
@@ -1378,7 +1434,9 @@ mod tests {
 
     #[test]
     fn test_we_use_the_count_properly() {
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27");
+        let mut rrule_result = convert_to_rrule(
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
 
         assert_eq!(27, rrule_result.get_next_iter_dates("", "").len())
     }
@@ -1410,7 +1468,9 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_1() {
-        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000");
+        let mut rrule_result = convert_to_rrule(
+            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000",
+        );
 
         assert_eq!(
             vec![
@@ -1511,7 +1571,8 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_1() {
-        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000");
+        let mut rrule_result =
+            convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000");
 
         assert_eq!(
             vec![
@@ -1546,7 +1607,9 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_2() {
-        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12", );
+        let mut rrule_result = convert_to_rrule(
+            "FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12",
+        );
 
         assert_eq!(
             vec![
@@ -1612,7 +1675,8 @@ mod tests {
 
     #[test]
     fn test_minutely_rules_work_1() {
-        let mut rrule_result = convert_to_rrule("FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",);
+        let mut rrule_result =
+            convert_to_rrule("FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000");
 
         assert_eq!(
             vec![
@@ -1782,7 +1846,9 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
         // test we get the right next date
-        let mut rrule_expected = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27");
+        let mut rrule_expected = convert_to_rrule(
+            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
+        );
         let mut rrule_1 = rrule_expected.to_json();
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
         assert_eq!(rrule_actual_1, rrule_expected)
