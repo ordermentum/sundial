@@ -1037,7 +1037,10 @@ pub struct ParseError {
 }
 
 /// Converts and rrule string to a rrule struct
-fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
+fn convert_to_rrule(rrule_string: &str) -> RRule {
+
+    let mut rrule_result = RRule::new();
+
     let parse_result = RRuleParser::parse(Rule::expr, rrule_string)
         .expect("unsuccessful parse") // unwrap the parse result
         .next()
@@ -1048,7 +1051,6 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             Rule::tz_expr => {
                 // parse timezone
                 let tz_unparsed: String = line.into_inner().next().unwrap().as_str().to_string();
-                // ToDo: add a check using chrono time zone to check if the timezone is parseable
                 rrule_result.tzid = tz_unparsed;
             }
 
@@ -1201,6 +1203,7 @@ fn convert_to_rrule<'a>(rrule_result: &mut RRule<'a>, rrule_string: &'a str) {
             _ => {}
         }
     }
+    rrule_result
 }
 
 fn generate_rrule_from_json(json: &str) -> RRule {
@@ -1221,7 +1224,7 @@ fn main() {
     let count = matches.value_of("count").unwrap_or("");
     let interval = matches.value_of("until").unwrap_or("");
     let mut rrule_result = RRule::new();
-    convert_to_rrule(&mut rrule_result, rrule);
+    let rrule_result = convert_to_rrule(rrule);
     println!(
         "{:?}",
         rrule_result.get_all_iter_dates_iso8601(count, interval)
@@ -1315,9 +1318,7 @@ mod tests {
         ];
 
         for i in &rrule_test_cases {
-            let mut rrule_result = RRule::new();
-
-            convert_to_rrule(&mut rrule_result, i.rrule_string);
+            let mut rrule_result = convert_to_rrule(i.rrule_string);
 
             assert_eq!(i.expected_flat_json, rrule_result.to_json())
         }
@@ -1325,25 +1326,15 @@ mod tests {
 
     #[test]
     fn test_we_use_the_count_properly() {
-        let mut rrule_result = RRule::new();
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27");
 
-        // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
-        );
         assert_eq!(27, rrule_result.get_next_iter_dates("", "").len())
     }
 
     #[test]
     fn test_until_params_works() {
-        let mut rrule_result = RRule::new();
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;DTSTART=20190327T133500;UNTIL=20200612T030000");
 
-        // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;DTSTART=20190327T133500;UNTIL=20200612T030000",
-        );
         assert_eq!(
             vec![
                 "2019-04-27T09:35:00+00:00".to_owned(),
@@ -1367,12 +1358,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_1() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000");
 
         assert_eq!(
             vec![
@@ -1391,12 +1377,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_2() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Darwin",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Darwin");
 
         assert_eq!(
             vec![
@@ -1411,12 +1392,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_3() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Brisbane",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Brisbane");
 
         assert_eq!(
             vec![
@@ -1431,12 +1407,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_4() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=DAILY;COUNT=6;INTERVAL=5;BYDAY=WE;BYHOUR=12;BYMINUTE=52;DTSTART=20190327T030000;TZID=Singapore",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=6;INTERVAL=5;BYDAY=WE;BYHOUR=12;BYMINUTE=52;DTSTART=20190327T030000;TZID=Singapore");
 
         assert_eq!(
             vec![
@@ -1453,12 +1424,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_5() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000");
 
         assert_eq!(
             vec![
@@ -1493,12 +1459,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_1() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000");
 
         assert_eq!(
             vec![
@@ -1533,12 +1494,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_2() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12", );
 
         assert_eq!(
             vec![
@@ -1573,12 +1529,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_3() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=HOURLY;INTERVAL=3;COUNT=20;BYDAY=TH;DTSTART=20190327T030000;TZID=Australia/Sydney",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;BYDAY=TH;DTSTART=20190327T030000;TZID=Australia/Sydney");
 
         assert_eq!(
             vec![
@@ -1609,12 +1560,7 @@ mod tests {
 
     #[test]
     fn test_minutely_rules_work_1() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000",);
 
         assert_eq!(
             vec![
@@ -1649,13 +1595,8 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rrules_1() {
-        let mut rrule_result = RRule::new();
-
         // test case group 1 - implicit by day from dtStart
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500");
         let mut iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
@@ -1668,9 +1609,7 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_2() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
+        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
         let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
@@ -1683,9 +1622,7 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_3() {
-        let mut rrule_result = RRule::new();
-
-        convert_to_rrule(&mut rrule_result, "FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
+        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003");
         let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
@@ -1698,12 +1635,8 @@ mod tests {
 
     #[test]
     fn test_monthly_rrule_1() {
-        let mut rrule_result = RRule::new();
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190315T011213;TZID=UTC",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190315T011213;TZID=UTC");
         assert_eq!(
             vec!["2019-03-28T09:01:13+00:00".to_owned()],
             rrule_result.get_all_iter_dates_iso8601("", "")
@@ -1712,12 +1645,8 @@ mod tests {
 
     #[test]
     fn test_monthly_rrule_2() {
-        let mut rrule_result = RRule::new();
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne");
         assert_eq!(
             vec![
                 "2019-04-28T12:12:13+10:00".to_owned(),
@@ -1729,12 +1658,8 @@ mod tests {
 
     #[test]
     fn test_monthly_rrule_3() {
-        let mut rrule_result = RRule::new();
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne", );
         assert_eq!(
             vec![
                 "2019-06-02T12:12:13+11:00".to_owned(),
@@ -1756,12 +1681,8 @@ mod tests {
 
     #[test]
     fn test_monthly_rrule_4() {
-        let mut rrule_result = RRule::new();
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_result,
-            "FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=11;BYMONTHDAY=12;DTSTART=20190402T011213;TZID=Australia/Sydney",
-        );
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=11;BYMONTHDAY=12;DTSTART=20190402T011213;TZID=Australia/Sydney");
         assert_eq!(
             vec![
                 "2019-11-12T12:12:13+11:00".to_owned(),
@@ -1783,10 +1704,8 @@ mod tests {
 
     #[test]
     fn we_support_yearly_rules_properly() {
-        let mut rrule_result = RRule::new();
-
         // test we get the right next date
-        convert_to_rrule(&mut rrule_result, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
+        let mut rrule_result = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1");
         let mut test_start_date = Utc
             .ymd(2019, 03, 15)
             .and_hms(01, 12, 13)
@@ -1801,26 +1720,19 @@ mod tests {
 
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_1() {
-        let mut rrule_expected_1 = RRule::new();
-
         // test we get the right next date
-        convert_to_rrule(&mut rrule_expected_1, "FREQ=YEARLY;COUNT=2;INTERVAL=1");
-        let mut rrule_1 = rrule_expected_1.to_json();
+        let mut rrule_expected = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1");
+        let mut rrule_1 = rrule_expected.to_json();
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
-        assert_eq!(rrule_actual_1, rrule_expected_1);
+        assert_eq!(rrule_actual_1, rrule_expected);
     }
 
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
-        let mut rrule_expected_1 = RRule::new();
-
         // test we get the right next date
-        convert_to_rrule(
-            &mut rrule_expected_1,
-            "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
-        );
-        let mut rrule_1 = rrule_expected_1.to_json();
+        let mut rrule_expected = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27");
+        let mut rrule_1 = rrule_expected.to_json();
         let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref());
-        assert_eq!(rrule_actual_1, rrule_expected_1)
+        assert_eq!(rrule_actual_1, rrule_expected)
     }
 }
