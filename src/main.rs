@@ -2,6 +2,8 @@
 extern crate pest_derive;
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate human_panic;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
@@ -1003,6 +1005,7 @@ fn add_month_to_date(date: DateTime<Tz>) -> DateTime<Tz> {
     }
     date_with_month_added
 }
+
 /// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
 /// forward from, this function
 /// selects the dates that are strictly in the future and returns a modified list
@@ -1206,6 +1209,13 @@ fn convert_to_rrule(rrule_string: &str) -> RRule {
     rrule_result
 }
 
+fn generate_rrule_from_json(json: &str) -> RRule {
+    let rrule = serde_json::from_str(json).unwrap();
+    validate_rrule(&rrule);
+    println!("rrule is {:?}", rrule);
+    rrule
+}
+
 fn validate_rrule(rrule: &RRule) {
     // validate byhour
     if !rrule.by_hour.is_empty() {
@@ -1314,13 +1324,10 @@ fn validate_rrule(rrule: &RRule) {
     }
 }
 
-fn generate_rrule_from_json(json: &str) -> RRule {
-    serde_json::from_str(json).unwrap()
-}
-
 // ToDo : Add validation for checking that the RRULE string was properly extracted from the parser
 // by counting ';' in the original rrule string and ':' in the parsed json
 fn main() {
+    setup_panic!();
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
     let rrule = matches.value_of("rrule").unwrap_or("");
@@ -1430,6 +1437,88 @@ mod tests {
 
             assert_eq!(i.expected_flat_json, rrule_result.to_json())
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_by_hour_validation_works() {
+        let rrule_json = r#"{
+  "tzid": "Australia/Perth",
+  "dtstart": "1997-07-14 13:30:00",
+  "until": "2133-04-22 13:35:00",
+  "frequency": "WEEKLY",
+  "interval": "1",
+  "byHour": [
+    "8",
+    "26"
+  ],
+  "byMinute": [
+    "30",
+    "45"
+  ],
+  "byDay": [
+    "TU",
+    "SU"
+  ]
+}"#;
+        generate_rrule_from_json(&rrule_json);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_by_minute_validation_works() {
+        let rrule_json = r#"{
+  "tzid": "Australia/Perth",
+  "dtstart": "1997-07-14 13:30:00",
+  "until": "2133-04-22 13:35:00",
+  "frequency": "WEEKLY",
+  "interval": "1",
+  "byHour": [
+    "8",
+    "26"
+  ],
+  "byMinute": [
+    "30",
+    "90"
+  ],
+  "byDay": [
+    "TU",
+    "SU"
+  ]
+}"#;
+        generate_rrule_from_json(&rrule_json);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_by_monthday_validation_works() {
+        let rrule_json = r#"{
+  "tzid": "Australia/Perth",
+  "dtstart": "1997-07-14 13:30:00",
+  "until": "2133-04-22 13:35:00",
+  "frequency": "WEEKLY",
+  "interval": "1",
+  "byHour": [
+    "8",
+    "26"
+  ],
+  "byMinute": [
+    "30",
+    "90"
+  ],
+  "byDay": [
+    "TU",
+    "SU"
+  ],
+  byMonthDay: [32],
+}"#;
+        generate_rrule_from_json(&rrule_json);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_tzid_validation_works() {
+        let rrule = convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;BYHOUR=8,12;BYMINUTE=30,45;BYDAY=TU,SU;TZID=Gondwana/BigContinent;DTSTART=19970714T133000;UNTIL=21330422T133500Z");
     }
 
     #[test]
@@ -1775,7 +1864,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule_3() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne", );
+        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne");
         assert_eq!(
             vec![
                 "2019-06-02T12:12:13+11:00".to_owned(),
