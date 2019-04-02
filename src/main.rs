@@ -1206,6 +1206,58 @@ fn convert_to_rrule(rrule_string: &str) -> RRule {
     rrule_result
 }
 
+pub fn validate_rrule(rrule: &mut RRule) {
+    // validate byhour
+    if !rrule.by_hour.is_empty() {
+        if rrule.by_hour.iter().find(|x| *x > 23).is_some() {
+            panic!("BYHOUR can only be in range 0-23 | Provided value {:?}", rrule.by_hour);
+        }
+    }
+
+    // validate byminute
+    if !rrule.by_minute.is_empty() {
+        if rrule.by_minute.iter().find(|x| *x > 59).is_some() {
+            panic!("BYMINUTE can only be in range 0-59 | Provided value {:?}", rrule.by_minute);
+        }
+    }
+
+    // validate bysecond
+    if !rrule.by_second.is_empty() {
+        if rrule.by_second.iter().find(|x| *x > 60).is_some() {
+            panic!("BYSECOND can only be in range 0-60 | Provided value {:?}", rrule.by_second);
+        }
+
+    }
+    // validate bymonthday
+    if !rrule.by_month_day.is_empty() {
+        if rrule.by_month_day.iter().find(|x| (*x > 31 || *x < 1)).is_some() {
+            panic!("BYMONTHDAY can only be in range 1-31 | Provided value {:?}", rrule.by_month_day);
+        }
+    }
+
+    // validate bymonth
+    if !rrule.by_month.is_empty() {
+        if rrule.by_month.iter().find(|x| (*x > 12 || *x < 1)).is_some() {
+            panic!("BYMONTH can only be in range 1-12 | Provided value {:?}", rrule.by_month);
+        }
+    }
+
+    // validate byyearday
+    if !rrule.by_year_day.is_empty() {
+        if rrule.by_year_day.iter().find(|x| (*x > 366 || *x < 1)).is_some() {
+            panic!("BYYEARDAY can only be in range 1-366 | Provided value {:?}", rrule.by_year_day);
+        }
+    }
+
+    // validate tzid
+    if !rrule.tzid.is_empty() {
+        let tz = rrule.tzid.parse::<Tz>();
+        if tz.is_err() {
+            panic!("Timezone ID: {:?} is not recognised, please try an IANA recognised tzid", rrule.tzid);
+        }
+    }
+}
+
 fn generate_rrule_from_json(json: &str) -> RRule {
     serde_json::from_str(json).unwrap()
 }
