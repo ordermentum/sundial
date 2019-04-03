@@ -1425,7 +1425,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::{convert_to_rrule, generate_rrule_from_json, RRule, validate_rrule};
+    use crate::{convert_to_rrule, generate_rrule_from_json, validate_rrule, RRule};
     use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc, Weekday};
     use chrono_tz::Etc::UTC;
     use chrono_tz::Tz;
