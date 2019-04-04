@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/sundial.svg)](https://crates.io/crates/sundial)
 [![crates.io](https://img.shields.io/crates/d/sundial.svg)](https://crates.io/crates/sundial)
+[![Build Status](https://badge.buildkite.com/bff0072dc879a668cac85b99f21dedcd21b1ba88016675f5e9.svg)](https://buildkite.com/ordermentum/sundial)
 
 Sundial is a library written in pure [Rust](https://www.rust-lang.org/) which partially implements the [iCalendar spec](https://tools.ietf.org/html/rfc5545) to support parsing of RRules.
 
