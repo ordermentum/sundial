@@ -85,7 +85,20 @@ OR
 
 This will give you the results of the rrule string intervals bounded by the count value of 25 or until 23/12/2022 3 am UTC, whichever comes first.
 
-Note that we currently only support parsing the until value argument as UTC date.
+Note that we currently only support parsing the until value argument as UTC
+date.
 
+------------------------------------------------------------
+
+### Running tests
+To run the full test suite:
+```
+$ cargo test --all
+```
+
+from the repository root.
+
+
+------------------------------------------------------------
 ### Useful Resources
 - [RRule Demo](https://jakubroztocil.github.io/rrule/)
