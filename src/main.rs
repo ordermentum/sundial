@@ -3,18 +3,7 @@ extern crate clap;
 #[macro_use]
 extern crate human_panic;
 
-use chrono::prelude::*;
-use chrono::{Duration, TimeZone};
-use chrono_tz::Tz;
 use clap::App;
-use pest::Parser;
-use serde::de::value::StrDeserializer;
-use serde::Deserialize;
-use serde::Serialize;
-use std::env;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use sundial::iter_dates_from_rrule;
 
 fn main() {
@@ -34,6 +23,6 @@ fn main() {
         Ok(rrule) => {
             println!("{:?}", rrule);
         }
-        Err(err) => println!("Encountered Rrule parse error"),
+        Err(_) => println!("Encountered Rrule parse error"),
     }
 }

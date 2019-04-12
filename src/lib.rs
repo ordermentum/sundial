@@ -1,19 +1,12 @@
 #[macro_use]
 extern crate pest_derive;
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate human_panic;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use chrono_tz::Tz;
-use clap::App;
 use pest::Parser;
-use serde::de::value::StrDeserializer;
 use serde::Deserialize;
 use serde::Serialize;
-use std::env;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -135,7 +128,7 @@ impl<'a> RRule<'a> {
 
         // we will work under the assumption that the date provided by dtstart parser will always be
         // and we will convert to the required timezone if provided.
-        let mut start_date = if self.dtstart.is_empty() {
+        let start_date = if self.dtstart.is_empty() {
             Utc::now().with_timezone(&timezone)
         } else {
             Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S")
@@ -148,10 +141,10 @@ impl<'a> RRule<'a> {
         let mut until = "";
 
         // assign default weekstart and reassign if present
-        let mut wkst = "MO";
+        let mut _wkst = "MO";
 
         if !self.wkst.is_empty() {
-            wkst = &self.wkst
+            _wkst = &self.wkst
         }
 
         // set count
@@ -300,11 +293,8 @@ impl<'a> RRule<'a> {
         let mut next_date: DateTime<Tz> = self.with_initial_time_intervals(start_date);
         let interval: u32 = self.interval.parse().unwrap_or(1);
 
-        let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month_day = self.by_month_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
-
-        let start_date_day = start_date.day();
 
         if by_month.is_empty() {
             if by_month_day.is_empty() {
@@ -418,7 +408,7 @@ impl<'a> RRule<'a> {
     }
 
     fn handle_daily(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
+        let start_date_with_intervals = self.with_initial_time_intervals(start_date);
 
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
@@ -475,12 +465,12 @@ impl<'a> RRule<'a> {
         if by_hour.is_empty() {
             if by_month.is_empty() {
                 if by_day.is_empty() {
-                    for i in 0..interval {
+                    for _i in 0..interval {
                         next_date = next_date + Duration::hours(1)
                     }
                 } else {
                     loop {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::hours(1)
                         }
                         if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -510,12 +500,12 @@ impl<'a> RRule<'a> {
             loop {
                 if by_month.is_empty() {
                     if by_day.is_empty() {
-                        for i in 0..interval {
+                        for _i in 0..interval {
                             next_date = next_date + Duration::hours(1)
                         }
                     } else {
                         loop {
-                            for i in 0..interval {
+                            for _i in 0..interval {
                                 next_date = next_date + Duration::hours(1)
                             }
                             if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day) {
@@ -556,7 +546,6 @@ impl<'a> RRule<'a> {
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
         let by_hour = self.by_hour.first().unwrap_or(&"").to_owned();
-        let by_minute = self.by_minute.first().unwrap_or(&"").to_owned();
 
         if by_hour.is_empty() {
             if by_month.is_empty() {
@@ -659,7 +648,7 @@ impl<'a> RRule<'a> {
             }
         } else {
             if by_day.is_empty() {
-                for i in 0..interval {
+                for _i in 0..interval {
                     next_date = next_date + Duration::seconds(1)
                 }
             } else {
@@ -1409,16 +1398,15 @@ pub fn iter_dates_from_rrule(
     let rrule_result = convert_to_rrule(rrule_string);
     match rrule_result {
         Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
-        Err(err) => Err(RuleParseError),
+        Err(_) => Err(RuleParseError),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{convert_to_rrule, generate_rrule_from_json, validate_rrule, RRule};
-    use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc, Weekday};
+    use chrono::{Datelike, TimeZone, Timelike, Utc, Weekday};
     use chrono_tz::Etc::UTC;
-    use chrono_tz::Tz;
     use std::iter::Iterator;
 
     struct RRuleTestCase<'a> {
@@ -1500,7 +1488,7 @@ mod tests {
         ];
 
         for i in &rrule_test_cases {
-            let mut rrule_result = convert_to_rrule(i.rrule_string).unwrap();
+            let rrule_result = convert_to_rrule(i.rrule_string).unwrap();
 
             assert_eq!(i.expected_flat_json, rrule_result.to_json())
         }
@@ -1592,7 +1580,7 @@ mod tests {
 
     #[test]
     fn test_we_use_the_count_properly() {
-        let mut rrule_result = convert_to_rrule(
+        let rrule_result = convert_to_rrule(
             "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         )
         .unwrap();
@@ -1602,7 +1590,7 @@ mod tests {
 
     #[test]
     fn test_until_params_works() {
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;DTSTART=20190327T133500;UNTIL=20200612T030000").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;DTSTART=20190327T133500;UNTIL=20200612T030000").unwrap();
 
         assert_eq!(
             vec![
@@ -1627,7 +1615,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_1() {
-        let mut rrule_result = convert_to_rrule(
+        let rrule_result = convert_to_rrule(
             "FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000",
         )
         .unwrap();
@@ -1649,7 +1637,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_2() {
-        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Darwin").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Darwin").unwrap();
 
         assert_eq!(
             vec![
@@ -1664,7 +1652,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_3() {
-        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Brisbane").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=4;INTERVAL=1;BYDAY=WE;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000;TZID=Australia/Brisbane").unwrap();
 
         assert_eq!(
             vec![
@@ -1679,7 +1667,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_4() {
-        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=6;INTERVAL=5;BYDAY=WE;BYHOUR=12;BYMINUTE=52;DTSTART=20190327T030000;TZID=Singapore").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=6;INTERVAL=5;BYDAY=WE;BYHOUR=12;BYMINUTE=52;DTSTART=20190327T030000;TZID=Singapore").unwrap();
 
         assert_eq!(
             vec![
@@ -1696,7 +1684,7 @@ mod tests {
 
     #[test]
     fn test_daily_rules_work_5() {
-        let mut rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=DAILY;COUNT=20;INTERVAL=3;BYDAY=FR;BYMONTH=11;BYHOUR=10;BYMINUTE=1;BYSECOND=58;DTSTART=20190327T030000").unwrap();
 
         assert_eq!(
             vec![
@@ -1731,7 +1719,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_1() {
-        let mut rrule_result =
+        let rrule_result =
             convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000").unwrap();
 
         assert_eq!(
@@ -1767,7 +1755,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_2() {
-        let mut rrule_result = convert_to_rrule(
+        let rrule_result = convert_to_rrule(
             "FREQ=HOURLY;INTERVAL=3;BYDAY=TU;COUNT=20;DTSTART=20190327T030000;BYHOUR=9;BYMINUTE=12",
         )
         .unwrap();
@@ -1805,7 +1793,7 @@ mod tests {
 
     #[test]
     fn test_hourly_rules_work_3() {
-        let mut rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;BYDAY=TH;DTSTART=20190327T030000;TZID=Australia/Sydney").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;BYDAY=TH;DTSTART=20190327T030000;TZID=Australia/Sydney").unwrap();
 
         assert_eq!(
             vec![
@@ -1836,7 +1824,7 @@ mod tests {
 
     #[test]
     fn test_minutely_rules_work_1() {
-        let mut rrule_result =
+        let rrule_result =
             convert_to_rrule("FREQ=MINUTELY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000").unwrap();
 
         assert_eq!(
@@ -1873,8 +1861,8 @@ mod tests {
     #[test]
     fn test_fortnightly_rrules_1() {
         // test case group 1 - implicit by day from dtStart
-        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500").unwrap();
-        let mut iter_dates = rrule_result.get_all_iter_dates("", "");
+        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500").unwrap();
+        let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Tue, date.weekday());
@@ -1886,7 +1874,7 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_2() {
-        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
         let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
@@ -1899,7 +1887,7 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_3() {
-        let mut rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
         let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
@@ -1913,7 +1901,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule_1() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190315T011213;TZID=UTC").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28;DTSTART=20190315T011213;TZID=UTC").unwrap();
         assert_eq!(
             vec!["2019-03-28T09:01:13+00:00".to_owned()],
             rrule_result.get_all_iter_dates_iso8601("", "")
@@ -1923,7 +1911,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule_2() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=2;BYMONTHDAY=28;DTSTART=20190402T011213;TZID=Australia/Melbourne").unwrap();
         assert_eq!(
             vec![
                 "2019-04-28T12:12:13+10:00".to_owned(),
@@ -1936,7 +1924,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule_3() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne").unwrap();
         assert_eq!(
             vec![
                 "2019-06-02T12:12:13+11:00".to_owned(),
@@ -1959,7 +1947,7 @@ mod tests {
     #[test]
     fn test_monthly_rrule_4() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=11;BYMONTHDAY=12;DTSTART=20190402T011213;TZID=Australia/Sydney").unwrap();
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=11;BYMONTHDAY=12;DTSTART=20190402T011213;TZID=Australia/Sydney").unwrap();
         assert_eq!(
             vec![
                 "2019-11-12T12:12:13+11:00".to_owned(),
@@ -1982,8 +1970,8 @@ mod tests {
     #[test]
     fn we_support_yearly_rules_properly() {
         // test we get the right next date
-        let mut rrule_result = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1").unwrap();
-        let mut test_start_date = Utc
+        let rrule_result = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1").unwrap();
+        let test_start_date = Utc
             .ymd(2019, 03, 15)
             .and_hms(01, 12, 13)
             .with_timezone(&UTC);
@@ -1998,21 +1986,21 @@ mod tests {
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_1() {
         // test we get the right next date
-        let mut rrule_expected = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1").unwrap();
-        let mut rrule_1 = rrule_expected.to_json();
-        let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref()).unwrap();
+        let rrule_expected = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1").unwrap();
+        let rrule_1 = rrule_expected.to_json();
+        let rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref()).unwrap();
         assert_eq!(rrule_actual_1, rrule_expected);
     }
 
     #[test]
     fn we_can_deserialize_rrule_json_succesfully_2() {
         // test we get the right next date
-        let mut rrule_expected = convert_to_rrule(
+        let rrule_expected = convert_to_rrule(
             "FREQ=MONTHLY;COUNT=27;INTERVAL=1;BYHOUR=9;BYMINUTE=1;BYMONTHDAY=28,27",
         )
         .unwrap();
-        let mut rrule_1 = rrule_expected.to_json();
-        let mut rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref()).unwrap();
+        let rrule_1 = rrule_expected.to_json();
+        let rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref()).unwrap();
         assert_eq!(rrule_actual_1, rrule_expected)
     }
 }
