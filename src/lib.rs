@@ -105,14 +105,6 @@ impl<'a> RRule<'a> {
         };
     }
 
-    fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-
-    fn to_json_pretty(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap()
-    }
-
     // show me the money
     // parent function that can get a list of all future iterations based on count
     fn get_all_iter_dates(
@@ -196,6 +188,14 @@ impl<'a> RRule<'a> {
         convert_datetime_tz_list_to_rfc339(
             self.get_all_iter_dates(count_from_args, until_from_args),
         )
+    }
+
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
     }
 
     fn get_next_iter_dates(
@@ -1379,17 +1379,6 @@ fn validate_rrule(rrule: &RRule) -> Result<(), RuleValidationError> {
     }
 }
 
-fn generate_rrule_from_json(json: &str) -> Result<RRule, RuleParseError> {
-    let rrule = serde_json::from_str(json).unwrap();
-    match validate_rrule(&rrule) {
-        Ok(()) => Ok(rrule),
-        Err(err) => {
-            eprintln!("Error encountered: {}", err);
-            Err(RuleParseError)
-        }
-    }
-}
-
 pub fn iter_dates_from_rrule(
     rrule_string: &str,
     count: &str,
@@ -1404,10 +1393,21 @@ pub fn iter_dates_from_rrule(
 
 #[cfg(test)]
 mod tests {
-    use crate::{convert_to_rrule, generate_rrule_from_json, validate_rrule, RRule};
+    use crate::{convert_to_rrule, validate_rrule, RRule, RuleParseError};
     use chrono::{Datelike, TimeZone, Timelike, Utc, Weekday};
     use chrono_tz::Etc::UTC;
     use std::iter::Iterator;
+
+    fn generate_rrule_from_json(json: &str) -> Result<RRule, RuleParseError> {
+        let rrule = serde_json::from_str(json).unwrap();
+        match validate_rrule(&rrule) {
+            Ok(()) => Ok(rrule),
+            Err(err) => {
+                eprintln!("Error encountered: {}", err);
+                Err(RuleParseError)
+            }
+        }
+    }
 
     struct RRuleTestCase<'a> {
         rrule_string: &'a str,
