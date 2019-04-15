@@ -7,6 +7,7 @@ use chrono_tz::Tz;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
+use std::any::Any;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -378,6 +379,10 @@ impl<'a> RRule<'a> {
 
     /// Handles both weekly and special variants of weekly such as [FREQ=WEEKLY;INTERVAL=2;]
     /// which can colloquially evaluate to fortnightly.
+    ///
+    /// if start_date_with_interval > start_date
+    ///     check if start_date_with_intervals is on the same day as today
+    ///     if yes, don't add and that's our first dat
     fn handle_weekly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
         let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
         // adjust start_date if it does not start on the start
@@ -387,22 +392,23 @@ impl<'a> RRule<'a> {
             .unwrap_or(&chrono_weekday_to_rrule_byday(start_date.weekday()))
             .to_owned();
 
+        let interval: u32 = self.interval.parse().unwrap_or(1);
         // now adjust the date to match the start day
-        let in_future = start_date_with_intervals.gt(&start_date);
+        let in_future_day = start_date_with_intervals.gt(&start_date)
+            && start_date_with_intervals.ordinal() > start_date.ordinal();
         let days_to_adjust =
-            self.calculate_weekday_distance(by_day, start_date.weekday(), in_future);
+            self.calculate_weekday_distance(by_day, start_date.weekday(), in_future_day);
         start_date_with_intervals = start_date_with_intervals + Duration::days(days_to_adjust);
 
-        let interval: u32 = self.interval.parse().unwrap_or(1);
         let mut next_date = start_date_with_intervals;
         for _i in 0..interval {
+            if start_date_with_intervals.gt(&start_date) {
+                break;
+            }
             next_date = next_date + Duration::days(7);
         }
         let final_days_to_adjust =
             self.calculate_weekday_distance(by_day, next_date.weekday(), false);
-        // do a final adjustment in case we are going over monthly boundaries
-        // and the calculated date day does not coincide with the one provided
-        // by the client
         next_date = next_date + Duration::days(final_days_to_adjust);
         next_date
     }
@@ -418,7 +424,6 @@ impl<'a> RRule<'a> {
 
         if by_month.is_empty() {
             if by_day.is_empty() {
-                println!("inside empty byday block");
                 for _i in 0..interval {
                     next_date = next_date + Duration::days(1);
                 }
@@ -434,7 +439,6 @@ impl<'a> RRule<'a> {
             }
         } else {
             if by_day.is_empty() {
-                println!("inside empty byday block");
                 for _i in 0..interval {
                     next_date = next_date + Duration::days(1);
                 }
@@ -1859,12 +1863,26 @@ mod tests {
     }
 
     #[test]
+    fn test_weekly_rrules_1() {
+        let mut rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=MO;BYHOUR=22;BYMINUTE=0;BYSECOND=30;DTSTART=20190415T031500")
+                .unwrap();
+        assert_eq!(
+            vec![
+                "2019-04-15T22:00:30+00:00",
+                "2019-04-22T22:00:30+00:00",
+                "2019-04-29T22:00:30+00:00",
+            ],
+            rrule_result.get_all_iter_dates_iso8601("", "")
+        )
+    }
+
+    #[test]
     fn test_fortnightly_rrules_1() {
         // test case group 1 - implicit by day from dtStart
         let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=0;BYSECOND=48;TZID=Australia/West;DTSTART=20190101T031500").unwrap();
         let iter_dates = rrule_result.get_all_iter_dates("", "");
         for date in iter_dates.iter() {
-            println!("Checking for date {:?}", date);
             assert_eq!(Weekday::Tue, date.weekday());
             assert_eq!(00, date.hour());
             assert_eq!(15, date.minute());
