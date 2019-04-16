@@ -105,7 +105,6 @@ impl<'a> RRule<'a> {
         };
     }
 
-    // show me the money
     // parent function that can get a list of all future iterations based on count
     fn get_all_iter_dates(
         &self,
@@ -180,6 +179,85 @@ impl<'a> RRule<'a> {
         next_dates_list
     }
 
+    // parent function that can get a list of all future iterations based on count, with the date list staring at or beyond the cutoff_date
+    fn get_all_iter_dates_from_cutoff(
+        &self,
+        count_from_args: &str,
+        until_from_args: &str,
+        cutoff_date: DateTime<Tz>,
+    ) -> Vec<DateTime<Tz>> {
+        let timezone: Tz = if self.tzid.is_empty() {
+            "UTC".parse().unwrap()
+        } else {
+            self.tzid.parse().unwrap()
+        };
+
+        // we will work under the assumption that the date provided by dtstart parser will always be
+        // and we will convert to the required timezone if provided.
+        let start_date = if self.dtstart.is_empty() {
+            Utc::now().with_timezone(&timezone)
+        } else {
+            Utc.datetime_from_str(&self.dtstart, "%Y-%m-%d %H:%M:%S")
+                .unwrap()
+                .with_timezone(&timezone)
+        };
+
+        let mut count: i32 = 52; // default count of iterations to build
+
+        let mut until = "";
+
+        // assign default weekstart and reassign if present
+        let mut _wkst = "MO";
+
+        if !self.wkst.is_empty() {
+            _wkst = &self.wkst
+        }
+
+        // set count
+        if count_from_args.is_empty() {
+            if !self.count.is_empty() {
+                count = self.count.parse().unwrap()
+            }
+        } else {
+            count = count_from_args.parse::<i32>().unwrap();
+        }
+
+        if until_from_args.is_empty() {
+            if !self.until.is_empty() {
+                until = &self.until;
+            }
+        } else {
+            until = until_from_args;
+        }
+
+        let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
+        let mut next_date = start_date;
+
+        if until.is_empty() {
+            while next_dates_list.len().lt(&(count as usize)) {
+                next_date = self.get_next_date(next_date);
+                if next_date.ge(&cutoff_date) {
+                    next_dates_list.push(next_date);
+                }
+            }
+        } else {
+            let until_date: DateTime<Tz> = Utc
+                .datetime_from_str(&until, "%Y-%m-%d %H:%M:%S")
+                .unwrap()
+                .with_timezone(&timezone);
+            while next_dates_list.len().lt(&(count as usize)) {
+                next_date = self.get_next_date(next_date);
+                if next_date.gt(&until_date) {
+                    break;
+                }
+                if next_date.ge(&cutoff_date) {
+                    next_dates_list.push(next_date);
+                }
+            }
+        }
+        next_dates_list
+    }
+
     fn get_all_iter_dates_iso8601(
         &self,
         count_from_args: &str,
@@ -190,6 +268,23 @@ impl<'a> RRule<'a> {
         )
     }
 
+    fn get_all_iter_dates_from_today_iso8601(
+        &self,
+        count_from_args: &str,
+        until_from_args: &str,
+    ) -> Vec<String> {
+        let timezone: Tz = if self.tzid.is_empty() {
+            "UTC".parse().unwrap()
+        } else {
+            self.tzid.parse().unwrap()
+        };
+        convert_datetime_tz_list_to_rfc339(self.get_all_iter_dates_from_cutoff(
+            count_from_args,
+            until_from_args,
+            Utc::now().with_timezone(&timezone),
+        ))
+    }
+
     fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
@@ -198,6 +293,7 @@ impl<'a> RRule<'a> {
         serde_json::to_string_pretty(self).unwrap()
     }
 
+    /// Gets a list of next dates that are
     fn get_next_iter_dates(
         &self,
         count_from_args: &str,
@@ -1382,7 +1478,7 @@ fn validate_rrule(rrule: &RRule) -> Result<(), RuleValidationError> {
     }
 }
 
-pub fn iter_dates_from_rrule(
+pub fn get_all_iter_dates(
     rrule_string: &str,
     count: &str,
     interval: &str,
@@ -1390,6 +1486,18 @@ pub fn iter_dates_from_rrule(
     let rrule_result = convert_to_rrule(rrule_string);
     match rrule_result {
         Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
+        Err(_) => Err(RuleParseError),
+    }
+}
+
+pub fn get_all_iter_dates_from_today(
+    rrule_string: &str,
+    count: &str,
+    interval: &str,
+) -> Result<Vec<String>, RuleParseError> {
+    let rrule_result = convert_to_rrule(rrule_string);
+    match rrule_result {
+        Ok(rrule) => Ok(rrule.get_all_iter_dates_from_today_iso8601(count, interval)),
         Err(_) => Err(RuleParseError),
     }
 }
@@ -2084,5 +2192,21 @@ mod tests {
         let rrule_1 = rrule_expected.to_json();
         let rrule_actual_1 = generate_rrule_from_json(rrule_1.as_ref()).unwrap();
         assert_eq!(rrule_actual_1, rrule_expected)
+    }
+
+    #[test]
+    fn we_can_scope_returned_results_8601_from_today() {
+        let rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=TU;BYHOUR=23;BYMINUTE=54;BYSECOND=0;TZID=Australia/Melbourne;DTSTART=20180110T034500")
+                .unwrap();
+
+        assert_eq!(
+            vec![
+                "2019-04-16T23:54:00+10:00",
+                "2019-04-23T23:54:00+10:00",
+                "2019-04-30T23:54:00+10:00",
+            ],
+            rrule_result.get_all_iter_dates_from_today_iso8601("", "")
+        )
     }
 }

@@ -4,7 +4,8 @@ extern crate clap;
 extern crate human_panic;
 
 use clap::App;
-use sundial::iter_dates_from_rrule;
+use sundial::get_all_iter_dates;
+use sundial::get_all_iter_dates_from_today;
 
 fn main() {
     setup_panic!();
@@ -18,7 +19,12 @@ fn main() {
 
     let count = matches.value_of("count").unwrap_or("");
     let interval = matches.value_of("until").unwrap_or("");
-    let rrule_dates = iter_dates_from_rrule(rrule, count, interval);
+    let cutoff = matches.is_present("cutoff");
+    let rrule_dates = if cutoff {
+        get_all_iter_dates_from_today(rrule, count, interval)
+    } else {
+        get_all_iter_dates(rrule, count, interval)
+    };
     match rrule_dates {
         Ok(rrule) => {
             println!("{:?}", rrule);
