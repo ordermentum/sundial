@@ -1,5 +1,5 @@
 name: sundial
-version: "0.1"
+version: "0.0.2"
 about: Rust Rrule parsing library based on the iCalendar spec
 args:
   - rrule:
@@ -22,3 +22,8 @@ args:
       value_name: until
       help: Provide a custom until date to override RRule UNTIL part
       takes_value: true
+  - cutoff:
+      long: cutoff
+      help: Flag that tells sundial to calculate only the iter dates that happen after today
+      required: false
+      takes_value: false
