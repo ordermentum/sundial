@@ -222,8 +222,6 @@ impl<'a> RRule<'a> {
             count = count_from_args.parse::<i32>().unwrap();
         }
 
-        println!("count is {:?}", count);
-
         if until_from_args.is_empty() {
             if !self.until.is_empty() {
                 until = &self.until;
