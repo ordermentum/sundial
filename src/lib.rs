@@ -1067,7 +1067,7 @@ fn lens_iter_dates(
 fn convert_datetime_tz_list_to_rfc339(dates_list: Vec<DateTime<Tz>>) -> Vec<String> {
     let mut converted_dates: Vec<String> = Vec::new();
     for date in dates_list.iter() {
-        converted_dates.push(date.to_rfc3339());
+        converted_dates.push(date.to_rfc3339_opts(SecondsFormat::Secs, false));
     }
     converted_dates
 }
