@@ -7,7 +7,6 @@ use chrono_tz::Tz;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
-use std::any::Any;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -1865,6 +1864,23 @@ mod tests {
     #[test]
     fn test_weekly_rrules_1() {
         let mut rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=5;BYDAY=TH;BYHOUR=14;BYMINUTE=0;BYSECOND=0;TZID=Australia/Sydney;DTSTART=20190415T160000")
+                .unwrap();
+        assert_eq!(
+            vec![
+                "2019-04-18T14:00:00+10:00",
+                "2019-04-25T14:00:00+10:00",
+                "2019-05-02T14:00:00+10:00",
+                "2019-05-09T14:00:00+10:00",
+                "2019-05-16T14:00:00+10:00",
+            ],
+            rrule_result.get_all_iter_dates_iso8601("", "")
+        )
+    }
+
+    #[test]
+    fn test_weekly_rrules_2() {
+        let mut rrule_result =
             convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=MO;BYHOUR=22;BYMINUTE=0;BYSECOND=30;DTSTART=20190415T031500")
                 .unwrap();
         assert_eq!(
@@ -1872,6 +1888,37 @@ mod tests {
                 "2019-04-15T22:00:30+00:00",
                 "2019-04-22T22:00:30+00:00",
                 "2019-04-29T22:00:30+00:00",
+            ],
+            rrule_result.get_all_iter_dates_iso8601("", "")
+        )
+    }
+
+    #[test]
+    fn test_weekly_rrules_3() {
+        let rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=4;BYDAY=WE;BYHOUR=14;BYMINUTE=55;BYSECOND=0;TZID=Australia/Sydney;DTSTART=20190411T000000")
+                .unwrap();
+        assert_eq!(
+            vec![
+                "2019-04-17T14:55:00+10:00",
+                "2019-04-24T14:55:00+10:00",
+                "2019-05-01T14:55:00+10:00",
+                "2019-05-08T14:55:00+10:00",
+            ],
+            rrule_result.get_all_iter_dates_iso8601("", "")
+        )
+    }
+
+    #[test]
+    fn test_weekly_rrules_4() {
+        let rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=TU;BYHOUR=23;BYMINUTE=54;BYSECOND=0;TZID=Australia/Melbourne;DTSTART=20190410T034500")
+                .unwrap();
+        assert_eq!(
+            vec![
+                "2019-04-16T23:54:00+10:00",
+                "2019-04-23T23:54:00+10:00",
+                "2019-04-30T23:54:00+10:00",
             ],
             rrule_result.get_all_iter_dates_iso8601("", "")
         )
@@ -1914,6 +1961,23 @@ mod tests {
             assert_eq!(00, date.minute());
             assert_eq!(03, date.second());
         }
+    }
+
+    #[test]
+    fn test_fortnightly_rrules_3() {
+        let rrule_result =
+            convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;COUNT=5;BYHOUR=10;BYMINUTE=30;BYSECOND=0;TZID=Australia/Sydney;DTSTART=20190411T000000")
+                .unwrap();
+        assert_eq!(
+            vec![
+                "2019-04-11T10:30:00+10:00",
+                "2019-04-25T10:30:00+10:00",
+                "2019-05-09T10:30:00+10:00",
+                "2019-05-23T10:30:00+10:00",
+                "2019-06-06T10:30:00+10:00",
+            ],
+            rrule_result.get_all_iter_dates_iso8601("", "")
+        )
     }
 
     #[test]
