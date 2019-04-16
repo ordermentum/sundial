@@ -88,6 +88,39 @@ This will give you the results of the rrule string intervals bounded by the coun
 Note that we currently only support parsing the until value argument as UTC
 date.
 
+
+### Using Date Cutoffs
+
+Sundial supports specifying the fact that the given rrule string might not have an updated `DTSTART` part and that we would like to have the dates from using current date as the cutoff date.
+
+This can be done by adding the optional `--cutoff` cli parameter.
+
+To illustrate,
+
+if we run 15th April 2019 at midnight: 
+
+```bash
+./sundial FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=TU;BYHOUR=23;BYMINUTE=54;BYSECOND=0;TZID=Australia/Melbourne;DTSTART=20180110T034500
+```
+
+without specifying the cutoff parameter, sundial will assume the DTSTART (10th January 2019) as the date to start sending results from, giving us:
+
+```
+["2018-01-16T23:54:00+11:00", "2018-01-23T23:54:00+11:00", "2018-01-30T23:54:00+11:00"]
+```
+
+however, if we specify the cutoff parameter, 
+
+```bash
+./sundial FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=TU;BYHOUR=23;BYMINUTE=54;BYSECOND=0;TZID=Australia/Melbourne;DTSTART=20180110T034500 --cutoff
+```
+
+sundial will keep on calculating until we start off on a date that is greater than or equal to current run date (in this case 15th April 2019 at midnight) and send a count of dates starting from that date, resulting in:
+
+```
+["2019-04-16T23:54:00+10:00", "2019-04-23T23:54:00+10:00", "2019-04-30T23:54:00+10:00"]
+```
+
 ------------------------------------------------------------
 
 ### Running tests
