@@ -654,6 +654,24 @@ mod tests {
     }
 
     #[test]
+    fn test_monthly_rrule_5() {
+        // test we get the right next date
+        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYMONTHDAY=12").unwrap();
+        let test_start_date = Utc
+            .ymd(2019, 04, 13)
+            .and_hms(01, 12, 13)
+            .with_timezone(&UTC);
+        let expected_next_date = Utc
+            .ymd(2019, 05, 12)
+            .and_hms(01, 12, 13)
+            .with_timezone(&UTC);
+        assert_eq!(
+            expected_next_date,
+            rrule_result.get_next_date(test_start_date).with_timezone(&UTC)
+        )
+    }
+
+    #[test]
     fn we_support_yearly_rules_properly() {
         // test we get the right next date
         let rrule_result = convert_to_rrule("FREQ=YEARLY;COUNT=2;INTERVAL=1").unwrap();
