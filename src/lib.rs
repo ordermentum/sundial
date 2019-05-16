@@ -554,7 +554,10 @@ impl<'a> RRule<'a> {
 
         if by_month.is_empty() {
             if by_day.is_empty() {
-                for _i in 0..interval {
+                if start_date.eq(&next_date) {
+                    next_date = next_date + Duration::days(1);
+                }
+                for _i in 1..interval {
                     next_date = next_date + Duration::days(1);
                 }
             } else {
@@ -1187,7 +1190,7 @@ fn lens_iter_dates(
 ) -> Vec<DateTime<Tz>> {
     let mut lensed_dates_list: Vec<DateTime<Tz>> = Vec::new();
     for date in dates_list.iter() {
-        if date.gt(&lens_from_date) {
+        if date.ge(&lens_from_date) {
             // only add dates in the future
             lensed_dates_list.push(date.to_owned())
         }
