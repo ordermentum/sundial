@@ -445,7 +445,7 @@ impl<'a> RRule<'a> {
                     // move forward a month
                     next_date = add_month_to_date(next_date);
                     next_date = next_date.with_day(by_month_day_u32).unwrap();
-                    for _i in 0..interval {
+                    for _i in 1..interval {
                         next_date = add_month_to_date(next_date);
                     }
                 } else if start_day == by_month_day_u32 {
