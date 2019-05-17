@@ -427,83 +427,25 @@ impl<'a> RRule<'a> {
         let by_month_day = self.by_month_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
 
-        if by_month.is_empty() {
-            if by_month_day.is_empty() {
-                for _i in 0..interval {
-                    next_date = add_month_to_date(next_date);
-                }
-            } else {
-                let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
-                let start_day = start_date.day();
-                if start_day < by_month_day_u32 {
-                    next_date = next_date.with_day(by_month_day_u32).unwrap();
-                    // here we start the interval at 1 since movement by day above counts as an inital monthly move
-                    for _i in 1..interval {
-                        next_date = add_month_to_date(next_date);
-                    }
-                } else if start_day > by_month_day_u32 {
-                    // move forward a month
-                    next_date = add_month_to_date(next_date);
-                    next_date = next_date.with_day(by_month_day_u32).unwrap();
-                    for _i in 1..interval {
-                        next_date = add_month_to_date(next_date);
-                    }
-                } else if start_day == by_month_day_u32 {
-                    if next_date.gt(&start_date) {
-                        next_date = add_month_to_date(next_date);
-                        next_date = next_date.with_day(by_month_day_u32).unwrap();
-                        for _i in 0..interval {
-                            next_date = add_month_to_date(next_date);
-                        }
-                    } else {
-                        next_date = next_date.with_day(by_month_day_u32).unwrap();
-                        for _i in 0..interval {
-                            next_date = add_month_to_date(next_date);
-                        }
-                    }
-                }
+        if !by_month.is_empty() {
+            let by_month_u32 = by_month.parse::<u32>().unwrap();
+            if by_month_u32 <= next_date.month() {
+                next_date = next_date.with_year(next_date.year() + 1).unwrap();
             }
-        } else {
-            loop {
-                if by_month_day.is_empty() {
-                    for _i in 0..interval {
-                        next_date = add_month_to_date(next_date);
-                    }
-                } else {
-                    let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
-                    let start_day = start_date.day();
-                    if start_day < by_month_day_u32 {
-                        next_date = next_date.with_day(by_month_day_u32).unwrap();
-                        for _i in 0..interval {
-                            next_date = add_month_to_date(next_date);
-                        }
-                    } else if start_day > by_month_day_u32 {
-                        // move forward a month
-                        next_date = add_month_to_date(next_date);
-                        next_date = next_date.with_day(by_month_day_u32).unwrap();
-                        for _i in 0..interval {
-                            next_date = add_month_to_date(next_date);
-                        }
-                    } else if start_day == by_month_day_u32 {
-                        if next_date.ge(&start_date) {
-                            next_date = add_month_to_date(next_date);
-                            next_date = next_date.with_day(by_month_day_u32).unwrap();
-                            for _i in 0..interval {
-                                next_date = add_month_to_date(next_date);
-                            }
-                        } else {
-                            next_date = next_date.with_day(by_month_day_u32).unwrap();
-                            for _i in 0..interval {
-                                next_date = add_month_to_date(next_date);
-                            }
-                        }
-                    }
-                }
-                if next_date.month().eq(&(by_month.parse::<u32>().unwrap())) {
-                    break;
-                }
-            }
+            next_date = next_date.with_month(by_month_u32).unwrap();
         }
+
+        if !by_month_day.is_empty() {
+            let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
+            next_date = next_date.with_day(by_month_day_u32).unwrap();
+        }
+
+        // If the calculated next_date is greater than the start date we don't need to add another month
+        let start = if next_date.gt(&start_date) { 1 } else { 0 };
+        for _i in start..interval {
+            next_date = add_month_to_date(next_date);
+        }
+
         next_date
     }
 
