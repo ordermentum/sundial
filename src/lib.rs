@@ -1190,7 +1190,7 @@ fn lens_iter_dates(
 ) -> Vec<DateTime<Tz>> {
     let mut lensed_dates_list: Vec<DateTime<Tz>> = Vec::new();
     for date in dates_list.iter() {
-        if date.ge(&lens_from_date) {
+        if date.gt(&lens_from_date) {
             // only add dates in the future
             lensed_dates_list.push(date.to_owned())
         }
