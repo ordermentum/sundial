@@ -427,17 +427,17 @@ impl<'a> RRule<'a> {
         let by_month_day = self.by_month_day.first().unwrap_or(&"").to_owned();
         let by_month = self.by_month.first().unwrap_or(&"").to_owned();
 
-        if !by_month.is_empty() {
-            let by_month_u32 = by_month.parse::<u32>().unwrap();
-            if by_month_u32 <= next_date.month() {
-                next_date = next_date.with_year(next_date.year() + 1).unwrap();
-            }
-            next_date = next_date.with_month(by_month_u32).unwrap();
-        }
-
         if !by_month_day.is_empty() {
             let by_month_day_u32 = by_month_day.parse::<u32>().unwrap();
             next_date = next_date.with_day(by_month_day_u32).unwrap();
+        }
+
+        if !by_month.is_empty() {
+            let by_month_u32 = by_month.parse::<u32>().unwrap();
+            next_date = next_date.with_month(by_month_u32).unwrap();
+            if next_date <= start_date {
+                next_date = next_date.with_year(next_date.year() + 1).unwrap();
+            }
         }
 
         // If the calculated next_date is greater than the start date we don't need to add another month
