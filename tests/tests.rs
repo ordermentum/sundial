@@ -325,6 +325,28 @@ mod tests {
     }
 
     #[test]
+    fn test_daily_rules_work_6() {
+        let rrule_result = convert_to_rrule(
+            "FREQ=DAILY;COUNT=4;INTERVAL=1;BYHOUR=9;BYMINUTE=1;DTSTART=20190327T030000",
+        )
+        .unwrap();
+
+        assert_eq!(
+            vec![
+                "2019-03-27 09:01:00".to_owned(),
+                "2019-03-28 09:01:00".to_owned(),
+                "2019-03-29 09:01:00".to_owned(),
+                "2019-03-30 09:01:00".to_owned()
+            ],
+            rrule_result
+                .get_all_iter_dates("", "")
+                .iter()
+                .map(|date| date.format("%Y-%m-%d %H:%M:%S").to_string().to_owned())
+                .collect::<Vec<String>>()
+        );
+    }
+
+    #[test]
     fn test_hourly_rules_work_1() {
         let rrule_result =
             convert_to_rrule("FREQ=HOURLY;INTERVAL=3;COUNT=20;DTSTART=20190327T030000").unwrap();
