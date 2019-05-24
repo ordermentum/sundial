@@ -635,7 +635,7 @@ mod tests {
         let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=12;BYMONTH=6;DTSTART=20190402T011213;TZID=Australia/Melbourne").unwrap();
         assert_eq!(
             vec![
-                "2019-06-02T12:12:13+11:00".to_owned(),
+                "2019-06-02T12:12:13+10:00".to_owned(),
                 "2020-06-02T12:12:13+10:00".to_owned(),
                 "2021-06-02T12:12:13+10:00".to_owned(),
                 "2022-06-02T12:12:13+10:00".to_owned(),
@@ -678,7 +678,8 @@ mod tests {
     #[test]
     fn test_monthly_rrule_5() {
         // test we get the right next date
-        let rrule_result = convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYMONTHDAY=12").unwrap();
+        let rrule_result =
+            convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYMONTHDAY=12").unwrap();
         let test_start_date = Utc
             .ymd(2019, 04, 13)
             .and_hms(01, 12, 13)
@@ -689,8 +690,90 @@ mod tests {
             .with_timezone(&UTC);
         assert_eq!(
             expected_next_date,
-            rrule_result.get_next_date(test_start_date).with_timezone(&UTC)
+            rrule_result
+                .get_next_date(test_start_date)
+                .with_timezone(&UTC)
         )
+    }
+
+    #[test]
+    fn test_monthly_rrule_by_month_day_edge_cases() {
+        let rrule_result =
+            convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYMONTHDAY=12;BYHOUR=17").unwrap();
+        let cases = vec![
+            (
+                Utc.ymd(2019, 04, 12)
+                    .and_hms(01, 12, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2019, 04, 12)
+                    .and_hms(17, 12, 13)
+                    .with_timezone(&UTC),
+            ),
+            (
+                Utc.ymd(2019, 04, 12)
+                    .and_hms(18, 12, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2019, 05, 12)
+                    .and_hms(17, 12, 13)
+                    .with_timezone(&UTC),
+            ),
+            (
+                Utc.ymd(2019, 04, 12)
+                    .and_hms(17, 12, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2019, 05, 12)
+                    .and_hms(17, 12, 13)
+                    .with_timezone(&UTC),
+            ),
+        ];
+
+        for case in cases {
+            assert_eq!(
+                case.1,
+                rrule_result.get_next_date(case.0).with_timezone(&UTC)
+            )
+        }
+    }
+
+    #[test]
+    fn test_monthly_rrule_by_month_edge_cases() {
+        // test we get the right next date
+        let rrule_result =
+            convert_to_rrule("FREQ=MONTHLY;INTERVAL=1;COUNT=1;BYMONTH=4;BYMONTHDAY=13;BYHOUR=17")
+                .unwrap();
+        let cases = vec![
+            (
+                Utc.ymd(2019, 04, 12)
+                    .and_hms(17, 13, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2019, 04, 13)
+                    .and_hms(17, 13, 13)
+                    .with_timezone(&UTC),
+            ),
+            (
+                Utc.ymd(2019, 04, 13)
+                    .and_hms(17, 13, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2020, 04, 13)
+                    .and_hms(17, 13, 13)
+                    .with_timezone(&UTC),
+            ),
+            (
+                Utc.ymd(2019, 04, 13)
+                    .and_hms(18, 13, 13)
+                    .with_timezone(&UTC),
+                Utc.ymd(2020, 04, 13)
+                    .and_hms(17, 13, 13)
+                    .with_timezone(&UTC),
+            ),
+        ];
+
+        for case in cases {
+            assert_eq!(
+                case.1,
+                rrule_result.get_next_date(case.0).with_timezone(&UTC)
+            )
+        }
     }
 
     #[test]
