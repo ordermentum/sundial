@@ -347,26 +347,25 @@ impl<'a> RRule<'a> {
 
     // standalone function that gets iterations from a single start date
     pub fn get_next_date(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut return_date = start_date;
-
-        if self.frequency.eq("YEARLY") {
-            return_date = self.handle_yearly(start_date)
+        let next_date = if self.frequency.eq("YEARLY") {
+            self.handle_yearly(start_date)
         } else if self.frequency == "MONTHLY" {
-            return_date = self.handle_monthly(start_date)
+            self.handle_monthly(start_date)
         } else if self.frequency == "WEEKLY" {
-            return_date = self.handle_weekly(start_date)
+            self.handle_weekly(start_date)
         } else if self.frequency == "DAILY" {
-            return_date = self.handle_daily(start_date)
+            self.handle_daily(start_date)
         } else if self.frequency == "HOURLY" {
-            return_date = self.handle_hourly(start_date);
+            self.handle_hourly(start_date)
         } else if self.frequency == "MINUTELY" {
-            return_date = self.handle_minutely(start_date);
+            self.handle_minutely(start_date)
         } else if self.frequency == "SECONDLY" {
-            return_date = self.handle_secondly(start_date);
+            self.handle_secondly(start_date)
         } else {
-            println!("Given rrule frequency is not supported");
-        }
-        return_date
+            // println!("Given rrule frequency is not supported");
+            start_date
+        };
+        return next_date;
     }
 
     // set the lower interval time for start date
