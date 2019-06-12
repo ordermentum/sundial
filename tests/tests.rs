@@ -489,7 +489,7 @@ mod tests {
 
     #[test]
     fn test_weekly_rrules_1() {
-        let mut rrule_result =
+        let rrule_result =
             convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=5;BYDAY=TH;BYHOUR=14;BYMINUTE=0;BYSECOND=0;TZID=Australia/Sydney;DTSTART=20190415T160000")
                 .unwrap();
         assert_eq!(
@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_weekly_rrules_2() {
-        let mut rrule_result =
+        let rrule_result =
             convert_to_rrule("FREQ=WEEKLY;INTERVAL=1;COUNT=3;BYDAY=MO;BYHOUR=22;BYMINUTE=0;BYSECOND=30;DTSTART=20190415T031500")
                 .unwrap();
         assert_eq!(
