@@ -237,33 +237,33 @@ impl<'a> RRule<'a> {
                 .with_timezone(&timezone)
         };
 
-        let mut count: i32 = 52; // default count of iterations to build
-
-        let mut until = "";
-
         // assign default weekstart and reassign if present
-        let mut _wkst = "MO";
-
-        if !self.wkst.is_empty() {
-            _wkst = &self.wkst
-        }
+        let _wkst = if !self.wkst.is_empty() {
+            &self.wkst
+        } else {
+            "MO"
+        };
 
         // set count
-        if count_from_args.is_empty() {
+        let count = if count_from_args.is_empty() {
             if !self.count.is_empty() {
-                count = self.count.parse().unwrap()
+                self.count.parse().unwrap()
+            } else {
+                52 // default count of iterations to build
             }
         } else {
-            count = count_from_args.parse::<i32>().unwrap();
-        }
+            count_from_args.parse::<i32>().unwrap()
+        };
 
-        if until_from_args.is_empty() {
+        let until = if until_from_args.is_empty() {
             if !self.until.is_empty() {
-                until = &self.until;
+                &self.until
+            } else {
+                ""
             }
         } else {
-            until = until_from_args;
-        }
+            until_from_args
+        };
 
         let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
@@ -370,27 +370,32 @@ impl<'a> RRule<'a> {
 
     // set the lower interval time for start date
     fn with_initial_time_intervals(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut start_date_with_intervals = start_date;
+        // let mut start_date_with_intervals = start_date;
 
-        if self.frequency.ne("SECONDLY") {
+        let start_date_with_second = if self.frequency.ne("SECONDLY") {
             let second: u32 = if !self.by_second.is_empty() {
                 self.by_second.first().unwrap().parse().unwrap()
             } else {
                 start_date.second()
             };
-            start_date_with_intervals = start_date_with_intervals.with_second(second).unwrap();
-        }
+            start_date.with_second(second).unwrap()
+        } else {
+            start_date
+        };
 
-        if self.frequency.ne("SECONDLY") && self.frequency.ne("MINUTELY") {
-            let minute: u32 = if !self.by_minute.is_empty() {
-                self.by_minute.first().unwrap().parse().unwrap()
+        let start_date_with_minute =
+            if self.frequency.ne("SECONDLY") && self.frequency.ne("MINUTELY") {
+                let minute: u32 = if !self.by_minute.is_empty() {
+                    self.by_minute.first().unwrap().parse().unwrap()
+                } else {
+                    start_date.minute()
+                };
+                start_date_with_second.with_minute(minute).unwrap()
             } else {
-                start_date.minute()
+                start_date_with_second
             };
-            start_date_with_intervals = start_date_with_intervals.with_minute(minute).unwrap();
-        }
 
-        if self.frequency.ne("SECONDLY")
+        let start_date_with_hour = if self.frequency.ne("SECONDLY")
             && self.frequency.ne("MINUTELY")
             && self.frequency.ne("HOURLY")
         {
@@ -399,10 +404,12 @@ impl<'a> RRule<'a> {
             } else {
                 start_date.hour()
             };
-            start_date_with_intervals = start_date_with_intervals.with_hour(hour).unwrap();
-        }
+            start_date_with_minute.with_hour(hour).unwrap()
+        } else {
+            start_date_with_minute
+        };
 
-        start_date_with_intervals
+        start_date_with_hour
     }
 
     // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
