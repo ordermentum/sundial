@@ -237,33 +237,33 @@ impl<'a> RRule<'a> {
                 .with_timezone(&timezone)
         };
 
-        let mut count: i32 = 52; // default count of iterations to build
-
-        let mut until = "";
-
         // assign default weekstart and reassign if present
-        let mut _wkst = "MO";
-
-        if !self.wkst.is_empty() {
-            _wkst = &self.wkst
-        }
+        let _wkst = if !self.wkst.is_empty() {
+            &self.wkst
+        } else {
+            "MO"
+        };
 
         // set count
-        if count_from_args.is_empty() {
+        let count = if count_from_args.is_empty() {
             if !self.count.is_empty() {
-                count = self.count.parse().unwrap()
+                self.count.parse().unwrap()
+            } else {
+                52 // default count of iterations to build
             }
         } else {
-            count = count_from_args.parse::<i32>().unwrap();
-        }
+            count_from_args.parse::<i32>().unwrap()
+        };
 
-        if until_from_args.is_empty() {
+        let until = if until_from_args.is_empty() {
             if !self.until.is_empty() {
-                until = &self.until;
+                &self.until
+            } else {
+                ""
             }
         } else {
-            until = until_from_args;
-        }
+            until_from_args
+        };
 
         let mut next_dates_list: Vec<DateTime<Tz>> = Vec::new();
         let mut next_date = start_date;
@@ -347,60 +347,69 @@ impl<'a> RRule<'a> {
 
     // standalone function that gets iterations from a single start date
     pub fn get_next_date(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut return_date = start_date;
-
-        if self.frequency.eq("YEARLY") {
-            return_date = self.handle_yearly(start_date)
+        let next_date = if self.frequency.eq("YEARLY") {
+            self.handle_yearly(start_date)
         } else if self.frequency == "MONTHLY" {
-            return_date = self.handle_monthly(start_date)
+            self.handle_monthly(start_date)
         } else if self.frequency == "WEEKLY" {
-            return_date = self.handle_weekly(start_date)
+            self.handle_weekly(start_date)
         } else if self.frequency == "DAILY" {
-            return_date = self.handle_daily(start_date)
+            self.handle_daily(start_date)
         } else if self.frequency == "HOURLY" {
-            return_date = self.handle_hourly(start_date);
+            self.handle_hourly(start_date)
         } else if self.frequency == "MINUTELY" {
-            return_date = self.handle_minutely(start_date);
+            self.handle_minutely(start_date)
         } else if self.frequency == "SECONDLY" {
-            return_date = self.handle_secondly(start_date);
+            self.handle_secondly(start_date)
         } else {
-            println!("Given rrule frequency is not supported");
-        }
-        return_date
+            // println!("Given rrule frequency is not supported");
+            start_date
+        };
+        return next_date;
     }
 
     // set the lower interval time for start date
     fn with_initial_time_intervals(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
-        let mut start_date_with_intervals = start_date;
+        // let mut start_date_with_intervals = start_date;
 
-        if self.frequency.ne("SECONDLY") {
-            let mut second: u32 = start_date.second();
-            if !self.by_second.is_empty() {
-                second = self.by_second.first().unwrap().parse().unwrap();
-            }
-            start_date_with_intervals = start_date_with_intervals.with_second(second).unwrap();
-        }
+        let start_date_with_second = if self.frequency.ne("SECONDLY") {
+            let second: u32 = if !self.by_second.is_empty() {
+                self.by_second.first().unwrap().parse().unwrap()
+            } else {
+                start_date.second()
+            };
+            start_date.with_second(second).unwrap()
+        } else {
+            start_date
+        };
 
-        if self.frequency.ne("SECONDLY") && self.frequency.ne("MINUTELY") {
-            let mut minute: u32 = start_date.minute();
-            if !self.by_minute.is_empty() {
-                minute = self.by_minute.first().unwrap().parse().unwrap();
-            }
-            start_date_with_intervals = start_date_with_intervals.with_minute(minute).unwrap();
-        }
+        let start_date_with_minute =
+            if self.frequency.ne("SECONDLY") && self.frequency.ne("MINUTELY") {
+                let minute: u32 = if !self.by_minute.is_empty() {
+                    self.by_minute.first().unwrap().parse().unwrap()
+                } else {
+                    start_date.minute()
+                };
+                start_date_with_second.with_minute(minute).unwrap()
+            } else {
+                start_date_with_second
+            };
 
-        if self.frequency.ne("SECONDLY")
+        let start_date_with_hour = if self.frequency.ne("SECONDLY")
             && self.frequency.ne("MINUTELY")
             && self.frequency.ne("HOURLY")
         {
-            let mut hour: u32 = start_date.hour();
-            if !self.by_hour.is_empty() {
-                hour = self.by_hour.first().unwrap().parse().unwrap();
-            }
-            start_date_with_intervals = start_date_with_intervals.with_hour(hour).unwrap();
-        }
+            let hour: u32 = if !self.by_hour.is_empty() {
+                self.by_hour.first().unwrap().parse().unwrap()
+            } else {
+                start_date.hour()
+            };
+            start_date_with_minute.with_hour(hour).unwrap()
+        } else {
+            start_date_with_minute
+        };
 
-        start_date_with_intervals
+        start_date_with_hour
     }
 
     // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
@@ -413,7 +422,7 @@ impl<'a> RRule<'a> {
             if next_date.year().lt(&(max_year as i32)) {
                 next_date = next_date.with_year(next_year).unwrap()
             }
-            next_year = next_year + 1;
+            next_year += 1;
         }
         next_date
     }
@@ -512,24 +521,23 @@ impl<'a> RRule<'a> {
                     }
                 }
             }
+        } else if by_day.is_empty() {
+            for _i in 0..interval {
+                next_date = next_date + Duration::days(1);
+            }
         } else {
-            if by_day.is_empty() {
+            loop {
                 for _i in 0..interval {
                     next_date = next_date + Duration::days(1);
                 }
-            } else {
-                loop {
-                    for _i in 0..interval {
-                        next_date = next_date + Duration::days(1);
-                    }
-                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                    {
-                        break;
-                    }
+                if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                    && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                {
+                    break;
                 }
             }
         }
+
         next_date
     }
 
@@ -557,21 +565,19 @@ impl<'a> RRule<'a> {
                         }
                     }
                 }
+            } else if by_day.is_empty() {
+                for _i in 0..interval {
+                    next_date = next_date + Duration::hours(1)
+                }
             } else {
-                if by_day.is_empty() {
+                loop {
                     for _i in 0..interval {
                         next_date = next_date + Duration::hours(1)
                     }
-                } else {
-                    loop {
-                        for _i in 0..interval {
-                            next_date = next_date + Duration::hours(1)
-                        }
-                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                        {
-                            break;
-                        }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                    {
+                        break;
                     }
                 }
             }
@@ -592,24 +598,23 @@ impl<'a> RRule<'a> {
                             }
                         }
                     }
+                } else if by_day.is_empty() {
+                    for _i in 0..interval {
+                        next_date = next_date + Duration::hours(1)
+                    }
                 } else {
-                    if by_day.is_empty() {
+                    loop {
                         for _i in 0..interval {
                             next_date = next_date + Duration::hours(1)
                         }
-                    } else {
-                        loop {
-                            for _i in 0..interval {
-                                next_date = next_date + Duration::hours(1)
-                            }
-                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                                && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                            {
-                                break;
-                            }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                        {
+                            break;
                         }
                     }
                 }
+
                 if next_date.hour().eq(&by_hour.parse::<u32>().unwrap()) {
                     break;
                 }
@@ -642,21 +647,19 @@ impl<'a> RRule<'a> {
                         }
                     }
                 }
+            } else if by_day.is_empty() {
+                for _i in 0..interval {
+                    next_date = next_date + Duration::minutes(1)
+                }
             } else {
-                if by_day.is_empty() {
+                loop {
                     for _i in 0..interval {
                         next_date = next_date + Duration::minutes(1)
                     }
-                } else {
-                    loop {
-                        for _i in 0..interval {
-                            next_date = next_date + Duration::minutes(1)
-                        }
-                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                        {
-                            break;
-                        }
+                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                    {
+                        break;
                     }
                 }
             }
@@ -677,21 +680,19 @@ impl<'a> RRule<'a> {
                             }
                         }
                     }
+                } else if by_day.is_empty() {
+                    for _i in 0..interval {
+                        next_date = next_date + Duration::minutes(1)
+                    }
                 } else {
-                    if by_day.is_empty() {
+                    loop {
                         for _i in 0..interval {
                             next_date = next_date + Duration::minutes(1)
                         }
-                    } else {
-                        loop {
-                            for _i in 0..interval {
-                                next_date = next_date + Duration::minutes(1)
-                            }
-                            if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                                && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                            {
-                                break;
-                            }
+                        if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                            && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                        {
+                            break;
                         }
                     }
                 }
@@ -725,21 +726,19 @@ impl<'a> RRule<'a> {
                     }
                 }
             }
+        } else if by_day.is_empty() {
+            for _i in 0..interval {
+                next_date = next_date + Duration::seconds(1)
+            }
         } else {
-            if by_day.is_empty() {
+            loop {
                 for _i in 0..interval {
                     next_date = next_date + Duration::seconds(1)
                 }
-            } else {
-                loop {
-                    for _i in 0..interval {
-                        next_date = next_date + Duration::seconds(1)
-                    }
-                    if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
-                        && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
-                    {
-                        break;
-                    }
+                if chrono_weekday_to_rrule_byday(next_date.weekday()).eq(by_day)
+                    && next_date.month().eq(&(by_month.parse::<u32>().unwrap()))
+                {
+                    break;
                 }
             }
         }
@@ -1173,7 +1172,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     // the spec any errors should be silently dropped when parsing
                     let non_validated_dtstart: String =
                         line.into_inner().next().unwrap().as_str().to_string();
-                    let tz_split: Vec<&str> = non_validated_dtstart.split(":").collect();
+                    let tz_split: Vec<&str> = non_validated_dtstart.split(':').collect();
                     if tz_split.len() > 1 {
                         // we have time zone
                         let tz = tz_split[0];
@@ -1195,7 +1194,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                 if rrule_result.dtstart.is_empty() {
                     let non_validated_dtstart: String =
                         line.into_inner().next().unwrap().as_str().to_string();
-                    if non_validated_dtstart.contains("Z") {
+                    if non_validated_dtstart.contains('Z') {
                         let naive_date =
                             NaiveDateTime::parse_from_str(&non_validated_dtstart, "%Y%m%dT%H%M%SZ")
                                 .unwrap();
@@ -1213,7 +1212,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
             Rule::until_expr_without_tz => {
                 let non_validated_until: String =
                     line.into_inner().next().unwrap().as_str().to_string();
-                if non_validated_until.contains("Z") {
+                if non_validated_until.contains('Z') {
                     let naive_date =
                         NaiveDateTime::parse_from_str(&non_validated_until, "%Y%m%dT%H%M%SZ")
                             .unwrap();
@@ -1248,7 +1247,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1258,7 +1257,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1268,7 +1267,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1278,7 +1277,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1288,7 +1287,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1298,7 +1297,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
 
@@ -1308,7 +1307,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                     .next()
                     .unwrap()
                     .as_str()
-                    .split(",")
+                    .split(',')
                     .collect();
             }
             _ => {}
@@ -1326,113 +1325,101 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
 pub fn validate_rrule(rrule: &RRule) -> Result<(), RuleValidationError> {
     let mut error_string: String = String::from("");
     // validate byhour
-    if !rrule.by_hour.is_empty() {
-        if rrule
+    if !rrule.by_hour.is_empty()
+        && rrule
             .by_hour
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| *x > 23)
-            .is_some()
-        {
-            error_string.push_str(&format!(
-                "BYHOUR can only be in range 0-23 | Provided value {:?}",
-                rrule.by_hour
-            ));
-        }
+            .any(|x| (x > 23))
+    {
+        error_string.push_str(&format!(
+            "BYHOUR can only be in range 0-23 | Provided value {:?}",
+            rrule.by_hour
+        ));
     }
 
     // validate byminute
-    if !rrule.by_minute.is_empty() {
-        if rrule
+    if !rrule.by_minute.is_empty()
+        && rrule
             .by_minute
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| *x > 59)
-            .is_some()
-        {
-            error_string.push_str(
-                format!(
-                    "BYMINUTE can only be in range 0-59 | Provided value {:?}",
-                    rrule.by_minute
-                )
-                .as_ref(),
-            );
-        }
+            .any(|x| (x > 59))
+    {
+        error_string.push_str(
+            format!(
+                "BYMINUTE can only be in range 0-59 | Provided value {:?}",
+                rrule.by_minute
+            )
+            .as_ref(),
+        );
     }
 
     // validate bysecond
-    if !rrule.by_second.is_empty() {
-        if rrule
+    if !rrule.by_second.is_empty()
+        && rrule
             .by_second
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| *x > 60)
-            .is_some()
-        {
-            error_string.push_str(
-                format!(
-                    "BYSECOND can only be in range 0-60 | Provided value {:?}",
-                    rrule.by_second
-                )
-                .as_ref(),
-            );
-        }
+            .any(|x| (x > 60))
+    {
+        error_string.push_str(
+            format!(
+                "BYSECOND can only be in range 0-60 | Provided value {:?}",
+                rrule.by_second
+            )
+            .as_ref(),
+        );
     }
     // validate bymonthday
-    if !rrule.by_month_day.is_empty() {
-        if rrule
+    if !rrule.by_month_day.is_empty()
+        && rrule
             .by_month_day
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| (*x > 31 || *x < 1))
-            .is_some()
-        {
-            error_string.push_str(
-                format!(
-                    "BYMONTHDAY can only be in range 1-31 | Provided value {:?}",
-                    rrule.by_month_day
-                )
-                .as_ref(),
-            );
-        }
+            .any(|x| (x > 31 || x < 1))
+    {
+        error_string.push_str(
+            format!(
+                "BYMONTHDAY can only be in range 1-31 | Provided value {:?}",
+                rrule.by_month_day
+            )
+            .as_ref(),
+        );
     }
 
     // validate bymonth
-    if !rrule.by_month.is_empty() {
-        if rrule
+    if !rrule.by_month.is_empty()
+        && rrule
             .by_month
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| (*x > 12 || *x < 1))
-            .is_some()
-        {
-            error_string.push_str(
-                format!(
-                    "BYMONTH can only be in range 1-12 | Provided value {:?}",
-                    rrule.by_month
-                )
-                .as_ref(),
-            );
-        }
+            .any(|x| (x > 12 || x < 1))
+    {
+        error_string.push_str(
+            format!(
+                "BYMONTH can only be in range 1-12 | Provided value {:?}",
+                rrule.by_month
+            )
+            .as_ref(),
+        );
     }
 
     // validate byyearday
-    if !rrule.by_year_day.is_empty() {
-        if rrule
+    if !rrule.by_year_day.is_empty()
+        && rrule
             .by_year_day
             .iter()
             .map(|x| x.parse::<u32>().unwrap())
-            .find(|x| (*x > 366 || *x < 1))
-            .is_some()
-        {
-            error_string.push_str(
-                format!(
-                    "BYYEARDAY can only be in range 1-366 | Provided value {:?}",
-                    rrule.by_year_day
-                )
-                .as_ref(),
-            );
-        }
+            .any(|x| (x > 366 || x < 1))
+    {
+        error_string.push_str(
+            format!(
+                "BYYEARDAY can only be in range 1-366 | Provided value {:?}",
+                rrule.by_year_day
+            )
+            .as_ref(),
+        );
     }
 
     // validate tzid
