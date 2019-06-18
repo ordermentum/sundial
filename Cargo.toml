@@ -1,12 +1,13 @@
 [package]
 name = "sundial"
 description = "Pure Rust library to parse and process iCalendar RRules"
-version = "0.0.3"
+categories = ["command-line-utilities","date-time-utility","iCalendar","rrule-processing"]
+version = "0.0.4"
 authors = ["shiveen <shiveen.pandita@ordermentum.com>"]
 edition = "2018"
 repository = "https://github.com/ordermentum/sundial"
 readme = "./README.md"
-keywords = ["rrule", "icalendar"]
+keywords = ["rrule","icalendar","utiltiy","cli"]
 license = "MIT"
 license-file = "./LICENSE.md"
 maintenance = { status = "actively-developed" }
