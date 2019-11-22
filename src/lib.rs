@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate pest_derive;
+#[macro_use] extern crate pest_derive;
+#[macro_use] extern crate failure_derive;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
@@ -7,13 +7,24 @@ use chrono_tz::Tz;
 use pest::Parser;
 use serde::Deserialize;
 use serde::Serialize;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+    
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
 struct RRuleParser;
+
+#[derive(Debug, Fail)]
+pub enum SundialError {
+    #[fail(display = "{}", name)]
+    RuleValidationError {
+        name: String
+    },
+    #[fail(display = "{}", name)]
+    RuleParseError {
+        name: String
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -362,10 +373,13 @@ impl<'a> RRule<'a> {
         } else if self.frequency == "SECONDLY" {
             self.handle_secondly(start_date)
         } else {
-            // println!("Given rrule frequency is not supported");
-            start_date
+            println!("Given rrule frequency is not supported");
+            Ok(start_date)
         };
-        return next_date;
+        return match next_date {
+            Ok(date) => date,
+            Err(_) => start_date,
+        }
     }
 
     // set the lower interval time for start date
@@ -413,7 +427,7 @@ impl<'a> RRule<'a> {
     }
 
     // currently only supports rrules of type: REQ=YEARLY;COUNT=x;INTERVAL=x
-    fn handle_yearly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_yearly(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let interval: u32 = self.interval.parse().unwrap_or(1);
         let max_year = 2099;
         let mut next_date = start_date;
@@ -424,12 +438,12 @@ impl<'a> RRule<'a> {
             }
             next_year += 1;
         }
-        next_date
+        Ok(next_date)
     }
 
     /// Handles the calculation of next date based on a monthly rule.
     /// Currently supports BYMONTH and BYMONTHDAY params
-    fn handle_monthly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_monthly(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let mut next_date: DateTime<Tz> = self.with_initial_time_intervals(start_date);
         let interval: u32 = self.interval.parse().unwrap_or(1);
 
@@ -451,11 +465,16 @@ impl<'a> RRule<'a> {
 
         // If the calculated next_date is greater than the start date we don't need to add another month
         let start = if next_date.gt(&start_date) { 1 } else { 0 };
+
         for _i in start..interval {
-            next_date = add_month_to_date(next_date);
+            match add_month_to_date(next_date) {
+                Ok(nxt) => next_date = nxt,
+                Err(err) => return Err(err),
+            }
+
         }
 
-        next_date
+        Ok(next_date)
     }
 
     /// Handles both weekly and special variants of weekly such as [FREQ=WEEKLY;INTERVAL=2;]
@@ -464,7 +483,7 @@ impl<'a> RRule<'a> {
     /// if start_date_with_interval > start_date
     ///     check if start_date_with_intervals is on the same day as today
     ///     if yes, don't add and that's our first dat
-    fn handle_weekly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_weekly(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let mut start_date_with_intervals = self.with_initial_time_intervals(start_date);
         // adjust start_date if it does not start on the start
         let by_day = self
@@ -491,10 +510,10 @@ impl<'a> RRule<'a> {
         let final_days_to_adjust =
             self.calculate_weekday_distance(by_day, next_date.weekday(), false);
         next_date = next_date + Duration::days(final_days_to_adjust);
-        next_date
+        Ok(next_date)
     }
 
-    fn handle_daily(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_daily(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let start_date_with_intervals = self.with_initial_time_intervals(start_date);
 
         let by_day = self.by_day.first().unwrap_or(&"").to_owned();
@@ -538,10 +557,10 @@ impl<'a> RRule<'a> {
             }
         }
 
-        next_date
+        Ok(next_date)
     }
 
-    fn handle_hourly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_hourly(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let mut next_date = self.with_initial_time_intervals(start_date);
         let interval: u32 = self.interval.parse().unwrap_or(1);
 
@@ -620,10 +639,10 @@ impl<'a> RRule<'a> {
                 }
             }
         }
-        next_date
+        Ok(next_date)
     }
 
-    fn handle_minutely(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_minutely(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let mut next_date = self.with_initial_time_intervals(start_date);
         let interval: u32 = self.interval.parse().unwrap_or(1);
 
@@ -701,10 +720,10 @@ impl<'a> RRule<'a> {
                 }
             }
         }
-        next_date
+        Ok(next_date)
     }
 
-    fn handle_secondly(&self, start_date: DateTime<Tz>) -> DateTime<Tz> {
+    fn handle_secondly(&self, start_date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
         let mut next_date = self.with_initial_time_intervals(start_date);
         let interval: u32 = self.interval.parse().unwrap_or(1);
 
@@ -742,7 +761,7 @@ impl<'a> RRule<'a> {
                 }
             }
         }
-        next_date
+        Ok(next_date)
     }
 
     /// Calculates the weekdays to add based on the given byweekday and current weekday.
@@ -1027,49 +1046,7 @@ impl<'a> RRule<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RuleValidationError {
-    validation_error_string: String,
-}
 
-impl Display for RuleValidationError {
-    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        write!(
-            f,
-            "RRule validation errors encountered: {}",
-            self.validation_error_string
-        )
-    }
-}
-
-impl Error for RuleValidationError {
-    fn description(&self) -> &str {
-        "Encountered Rrule validation errors"
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        None
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RuleParseError;
-
-impl Display for RuleParseError {
-    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        write!(f, "encountered parsing error")
-    }
-}
-
-impl Error for RuleParseError {
-    fn description(&self) -> &str {
-        "encountered parsing errors"
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        None
-    }
-}
 
 fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
     return match weekday {
@@ -1084,7 +1061,7 @@ fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
 }
 
 /// Adds a month to a given timezone aware `DateTime` type and takes care of any monthly boundaries
-fn add_month_to_date(date: DateTime<Tz>) -> DateTime<Tz> {
+fn add_month_to_date(date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
     let mut date_with_month_added: DateTime<Tz> = date;
     let year = date.year();
 
@@ -1112,13 +1089,13 @@ fn add_month_to_date(date: DateTime<Tz>) -> DateTime<Tz> {
             date_with_month_added = date_with_month_added + Duration::days(30);
         }
         _ => {
-            panic!(
+            return Err(SundialError::RuleParseError { name: format!(
                 "Unrecognised month value when adding month to date {:?}",
                 date
-            );
+            )});
         }
     }
-    date_with_month_added
+    Ok(date_with_month_added)
 }
 
 /// Given a `dates_list` of future iteration dates and a `lens_from_date` to look
@@ -1148,7 +1125,7 @@ fn convert_datetime_tz_list_to_rfc339(dates_list: Vec<DateTime<Tz>>) -> Vec<Stri
 }
 
 /// Converts and rrule string to a rrule struct
-pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
+pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, SundialError> {
     let mut rrule_result = RRule::new();
 
     let parse_result = RRuleParser::parse(Rule::expr, rrule_string)
@@ -1184,7 +1161,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
                             .unwrap()
                             .to_string();
                     } else {
-                        panic!("Invalid DTSTART;TZID string {}", non_validated_dtstart)
+                        return Err(SundialError::RuleParseError { name: format!("Invalid DTSTART;TZID string {}", non_validated_dtstart) } )
                     }
                 }
             }
@@ -1316,13 +1293,12 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, RuleParseError> {
     match validate_rrule(&rrule_result) {
         Ok(()) => Ok(rrule_result),
         Err(err) => {
-            eprintln!("Error encountered: {}", err);
-            Err(RuleParseError)
+            Err(err)
         }
     }
 }
 
-pub fn validate_rrule(rrule: &RRule) -> Result<(), RuleValidationError> {
+pub fn validate_rrule(rrule: &RRule) -> Result<(), SundialError> {
     let mut error_string: String = String::from("");
     // validate byhour
     if !rrule.by_hour.is_empty()
@@ -1439,32 +1415,32 @@ pub fn validate_rrule(rrule: &RRule) -> Result<(), RuleValidationError> {
     if error_string.is_empty() {
         Ok(())
     } else {
-        Err(RuleValidationError {
-            validation_error_string: error_string.to_owned(),
+        Err(SundialError::RuleValidationError {
+            name: error_string,
         })
     }
 }
 
-pub fn get_all_iter_dates(
-    rrule_string: &str,
-    count: &str,
-    interval: &str,
-) -> Result<Vec<String>, RuleParseError> {
-    let rrule_result = convert_to_rrule(rrule_string);
-    match rrule_result {
-        Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
-        Err(_) => Err(RuleParseError),
+    pub fn get_all_iter_dates(
+        rrule_string: &str,
+        count: &str,
+        interval: &str,
+    ) -> Result<Vec<String>, SundialError> {
+        let rrule_result = convert_to_rrule(rrule_string);
+        match rrule_result {
+            Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
+            Err(err) => Err(err),
+        }
     }
-}
 
-pub fn get_all_iter_dates_from_today(
-    rrule_string: &str,
-    count: &str,
-    interval: &str,
-) -> Result<Vec<String>, RuleParseError> {
-    let rrule_result = convert_to_rrule(rrule_string);
-    match rrule_result {
-        Ok(rrule) => Ok(rrule.get_all_iter_dates_from_today_iso8601(count, interval)),
-        Err(_) => Err(RuleParseError),
+    pub fn get_all_iter_dates_from_today(
+        rrule_string: &str,
+        count: &str,
+        interval: &str,
+    ) -> Result<Vec<String>, SundialError> {
+        let rrule_result = convert_to_rrule(rrule_string);
+        match rrule_result {
+            Ok(rrule) => Ok(rrule.get_all_iter_dates_from_today_iso8601(count, interval)),
+            Err(err) => Err(err),
+        }
     }
-}

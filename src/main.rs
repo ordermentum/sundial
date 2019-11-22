@@ -4,8 +4,7 @@ extern crate clap;
 extern crate human_panic;
 
 use clap::App;
-use sundial::get_all_iter_dates;
-use sundial::get_all_iter_dates_from_today;
+use sundial::{get_all_iter_dates_from_today, get_all_iter_dates};
 
 fn main() {
     setup_panic!();
@@ -29,6 +28,6 @@ fn main() {
         Ok(rrule) => {
             println!("{:?}", rrule);
         }
-        Err(_) => println!("Encountered Rrule parse error"),
+        Err(err) => println!("Encountered Rrule parse error: {}", err),
     }
 }

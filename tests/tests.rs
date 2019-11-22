@@ -3,15 +3,15 @@ mod tests {
     use chrono::{Datelike, TimeZone, Timelike, Utc, Weekday};
     use chrono_tz::Etc::UTC;
     use std::iter::Iterator;
-    use sundial::{convert_to_rrule, validate_rrule, RRule, RuleParseError};
+    use sundial::{convert_to_rrule, validate_rrule, RRule, SundialError};
 
-    fn generate_rrule_from_json(json: &str) -> Result<RRule, RuleParseError> {
+    fn generate_rrule_from_json(json: &str) -> Result<RRule, SundialError> {
         let rrule = serde_json::from_str(json).unwrap();
         match validate_rrule(&rrule) {
             Ok(()) => Ok(rrule),
-            Err(err) => {
+            Err(err) => { 
                 eprintln!("Error encountered: {}", err);
-                Err(RuleParseError)
+                Err(err)
             }
         }
     }
