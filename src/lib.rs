@@ -510,6 +510,7 @@ impl<'a> RRule<'a> {
         let final_days_to_adjust =
             self.calculate_weekday_distance(by_day, next_date.weekday(), false);
         next_date = next_date + Duration::days(final_days_to_adjust);
+
         Ok(next_date)
     }
 

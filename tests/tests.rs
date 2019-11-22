@@ -441,11 +441,11 @@ mod tests {
                 "2019-04-04T14:00:00+11:00".to_owned(),
                 "2019-04-04T17:00:00+11:00".to_owned(),
                 "2019-04-04T20:00:00+11:00".to_owned(),
-                "2019-04-04T23:00:00+11:00".to_owned(),
-                "2019-04-11T02:00:00+11:00".to_owned(),
-                "2019-04-11T05:00:00+10:00".to_owned(),
-                "2019-04-11T08:00:00+10:00".to_owned(),
-                "2019-04-11T11:00:00+10:00".to_owned(),
+                "2019-04-04T23:00:00+10:00".to_owned(),
+                "2019-04-11T01:00:00+10:00".to_owned(),
+                "2019-04-11T04:00:00+10:00".to_owned(),
+                "2019-04-11T07:00:00+10:00".to_owned(),
+                "2019-04-11T10:00:00+10:00".to_owned(),
             ],
             rrule_result.get_all_iter_dates_iso8601("", "")
         );
@@ -565,11 +565,11 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_2() {
-        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
-        let iter_dates = rrule_result.get_all_iter_dates("", "");
+        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=2019062T000003").unwrap();
+        let iter_dates = rrule_result.get_all_iter_dates("5", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
-            assert_eq!(Weekday::Thu, date.weekday());
+            assert_eq!(Weekday::Sun, date.weekday());
             assert_eq!(17, date.hour());
             assert_eq!(00, date.minute());
             assert_eq!(03, date.second());
@@ -578,11 +578,11 @@ mod tests {
 
     #[test]
     fn test_fortnightly_rules_3() {
-        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=20181122T000003").unwrap();
-        let iter_dates = rrule_result.get_all_iter_dates("", "");
+        let rrule_result = convert_to_rrule("FREQ=WEEKLY;INTERVAL=2;BYHOUR=17;BYMINUTE=0;TZID=Australia/Sydney;DTSTART=2019062T000003").unwrap();
+        let iter_dates = rrule_result.get_all_iter_dates("5", "");
         for date in iter_dates.iter() {
             println!("Checking for date {:?}", date);
-            assert_eq!(Weekday::Thu, date.weekday());
+            assert_eq!(Weekday::Sun, date.weekday());
             assert_eq!(17, date.hour());
             assert_eq!(00, date.minute());
             assert_eq!(03, date.second());
