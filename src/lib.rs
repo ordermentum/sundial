@@ -1,14 +1,14 @@
-#[macro_use] extern crate pest_derive;
-#[macro_use] extern crate failure_derive;
+#[macro_use]
+extern crate pest_derive;
+#[macro_use]
+extern crate failure_derive;
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use chrono_tz::Tz;
 use pest::Parser;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-    
 
 #[derive(Parser)]
 #[grammar = "rrule.pest"]
@@ -17,13 +17,9 @@ struct RRuleParser;
 #[derive(Debug, Fail)]
 pub enum SundialError {
     #[fail(display = "{}", name)]
-    RuleValidationError {
-        name: String
-    },
+    RuleValidationError { name: String },
     #[fail(display = "{}", name)]
-    RuleParseError {
-        name: String
-    }
+    RuleParseError { name: String },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -379,7 +375,7 @@ impl<'a> RRule<'a> {
         return match next_date {
             Ok(date) => date,
             Err(_) => start_date,
-        }
+        };
     }
 
     // set the lower interval time for start date
@@ -471,7 +467,6 @@ impl<'a> RRule<'a> {
                 Ok(nxt) => next_date = nxt,
                 Err(err) => return Err(err),
             }
-
         }
 
         Ok(next_date)
@@ -1047,8 +1042,6 @@ impl<'a> RRule<'a> {
     }
 }
 
-
-
 fn chrono_weekday_to_rrule_byday(weekday: Weekday) -> &'static str {
     return match weekday {
         Weekday::Mon => "MO",
@@ -1090,10 +1083,12 @@ fn add_month_to_date(date: DateTime<Tz>) -> Result<DateTime<Tz>, SundialError> {
             date_with_month_added = date_with_month_added + Duration::days(30);
         }
         _ => {
-            return Err(SundialError::RuleParseError { name: format!(
-                "Unrecognised month value when adding month to date {:?}",
-                date
-            )});
+            return Err(SundialError::RuleParseError {
+                name: format!(
+                    "Unrecognised month value when adding month to date {:?}",
+                    date
+                ),
+            });
         }
     }
     Ok(date_with_month_added)
@@ -1162,7 +1157,9 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, SundialError> {
                             .unwrap()
                             .to_string();
                     } else {
-                        return Err(SundialError::RuleParseError { name: format!("Invalid DTSTART;TZID string {}", non_validated_dtstart) } )
+                        return Err(SundialError::RuleParseError {
+                            name: format!("Invalid DTSTART;TZID string {}", non_validated_dtstart),
+                        });
                     }
                 }
             }
@@ -1293,9 +1290,7 @@ pub fn convert_to_rrule(rrule_string: &str) -> Result<RRule, SundialError> {
     }
     match validate_rrule(&rrule_result) {
         Ok(()) => Ok(rrule_result),
-        Err(err) => {
-            Err(err)
-        }
+        Err(err) => Err(err),
     }
 }
 
@@ -1416,32 +1411,30 @@ pub fn validate_rrule(rrule: &RRule) -> Result<(), SundialError> {
     if error_string.is_empty() {
         Ok(())
     } else {
-        Err(SundialError::RuleValidationError {
-            name: error_string,
-        })
+        Err(SundialError::RuleValidationError { name: error_string })
     }
 }
 
-    pub fn get_all_iter_dates(
-        rrule_string: &str,
-        count: &str,
-        interval: &str,
-    ) -> Result<Vec<String>, SundialError> {
-        let rrule_result = convert_to_rrule(rrule_string);
-        match rrule_result {
-            Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
-            Err(err) => Err(err),
-        }
+pub fn get_all_iter_dates(
+    rrule_string: &str,
+    count: &str,
+    interval: &str,
+) -> Result<Vec<String>, SundialError> {
+    let rrule_result = convert_to_rrule(rrule_string);
+    match rrule_result {
+        Ok(rrule) => Ok(rrule.get_all_iter_dates_iso8601(count, interval)),
+        Err(err) => Err(err),
     }
+}
 
-    pub fn get_all_iter_dates_from_today(
-        rrule_string: &str,
-        count: &str,
-        interval: &str,
-    ) -> Result<Vec<String>, SundialError> {
-        let rrule_result = convert_to_rrule(rrule_string);
-        match rrule_result {
-            Ok(rrule) => Ok(rrule.get_all_iter_dates_from_today_iso8601(count, interval)),
-            Err(err) => Err(err),
-        }
+pub fn get_all_iter_dates_from_today(
+    rrule_string: &str,
+    count: &str,
+    interval: &str,
+) -> Result<Vec<String>, SundialError> {
+    let rrule_result = convert_to_rrule(rrule_string);
+    match rrule_result {
+        Ok(rrule) => Ok(rrule.get_all_iter_dates_from_today_iso8601(count, interval)),
+        Err(err) => Err(err),
     }
+}

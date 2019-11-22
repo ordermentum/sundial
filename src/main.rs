@@ -4,7 +4,7 @@ extern crate clap;
 extern crate human_panic;
 
 use clap::App;
-use sundial::{get_all_iter_dates_from_today, get_all_iter_dates};
+use sundial::{get_all_iter_dates, get_all_iter_dates_from_today};
 
 fn main() {
     setup_panic!();
