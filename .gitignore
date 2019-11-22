@@ -1,2 +1,3 @@
 /target
+sundial_wasm/target
 **/*.rs.bk

@@ -1,5 +1,5 @@
 [package]
-name = "sundial"
+name = "sundial_wasm"
 description = "Pure Rust library to parse and process iCalendar RRules"
 categories = ["date-time-utility","iCalendar","rrule-processing"]
 version = "0.1.0"
@@ -10,15 +10,16 @@ readme = "./README.md"
 keywords = ["rrule","icalendar","utiltiy","cli"]
 license-file = "../LICENSE.md"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-clap = { version = "2.32.0", features = ["yaml"] }
-chrono = "0.4"
-failure = "0.1.6"
-failure_derive = "0.1.6"
-chrono-tz = "0.4"
-serde_json = "1.0"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+sundial = { path = "../" }
+serde = "^1.0.59"
+serde_derive = "^1.0.59"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
-pest = "2.1.0"
-pest_derive = "2.0"
-human-panic = "1.0.1"
+serde_json = "1.0"
